@@ -251,13 +251,17 @@
     // const SUBMIT_URL = "https://your-domain.com/webhook/application-form";
     const SUBMIT_URL = "https://domestic-gotta-symposium-explanation.trycloudflare.com/webhook/application-form";
 
-    // Optional: read token from URL (example: ?token=abc123)
+    // Optional: read token and messenger id from URL (example: ?token=abc123&messenger_id=...)
     const params = new URLSearchParams(location.search);
     const token = params.get("token");
+    const messengerId = params.get("messenger_id") || params.get("messenger") || params.get("sender_id") || params.get("mid");
     const tokenPill = document.getElementById("tokenPill");
-    if (token) {
+    if (token || messengerId) {
       tokenPill.style.display = "";
-      tokenPill.textContent = "token: " + token;
+      const parts = [];
+      if (token) parts.push("token: " + token);
+      if (messengerId) parts.push("messenger_id: " + messengerId);
+      tokenPill.textContent = parts.join(" • ");
     }
 
     function toInt(v) {
@@ -302,6 +306,7 @@
 
       const payload = {
         token: token || null,
+        messenger_id: messengerId || null,
         full_name,
         rank_code_or_name: rank,
         experience_months: String(exp_total_months),
