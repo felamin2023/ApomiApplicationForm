@@ -467,6 +467,11 @@
             }
           }
 
+          // n8n can return HTTP 200 with an application-level error payload.
+          if (responseData && responseData.ok === false) {
+            throw new Error(responseData.error || "Submission failed.");
+          }
+
           const successMessage =
             responseData && responseData.message
               ? responseData.message
