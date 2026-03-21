@@ -191,6 +191,31 @@
         gap: 10px;
         flex-wrap: wrap;
       }
+      .doc-list {
+        margin-top: 10px;
+        display: grid;
+        gap: 8px;
+      }
+      .doc-row {
+        display: grid;
+        grid-template-columns: 1fr 220px;
+        gap: 10px;
+      }
+      .doc-file {
+        display: flex;
+        align-items: center;
+        font-size: 12px;
+        color: var(--text);
+        background: rgba(11, 15, 20, 0.55);
+        border: 1px solid rgba(34, 48, 67, 0.9);
+        border-radius: 10px;
+        padding: 10px 12px;
+      }
+      @media (max-width: 720px) {
+        .doc-row {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
   </head>
   <body>
@@ -328,29 +353,10 @@
             multiple
             accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
           />
-
-          <div class="grid" style="margin-top: 12px">
-            <div>
-              <label for="doc_code_default">Default document code</label>
-              <input
-                id="doc_code_default"
-                name="doc_code_default"
-                placeholder="e.g., PASSPORT"
-              />
-            </div>
-            <div>
-              <label for="doc_path_prefix">Storage path prefix</label>
-              <input
-                id="doc_path_prefix"
-                name="doc_path_prefix"
-                placeholder="e.g., web-form/uploads"
-              />
-            </div>
-          </div>
+          <div id="docList" class="doc-list"></div>
           <div class="hint">
-            Selected files are submitted as document metadata to the backend,
-            using bucket <strong>application-docs</strong>. If your backend does
-            not upload binary files yet, these entries are metadata only.
+            Upload one or more files. After selecting files, choose the closest
+            document type for each file.
           </div>
 
           <div class="actions">
@@ -409,9 +415,80 @@
           .replace(/^_+|_+$/g, "");
       }
 
+      const DOCUMENT_TYPES = [
+        { code: "SEAMAN_BOOK", label: "Seaman's Book" },
+        { code: "PASSPORT", label: "Passport" },
+        { code: "COC", label: "Certificate of Competency (COC)" },
+        { code: "MEDICAL", label: "Medical Certificate" },
+        { code: "VISA", label: "Visa" },
+        { code: "RESUME", label: "Resume / CV" },
+        { code: "TRAINING_CERT", label: "Training Certificate" },
+        { code: "OTHER", label: "Other" },
+      ];
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function guessDocCode(fileName) {
+        const n = String(fileName || "").toLowerCase();
+        if (n.includes("seaman") || n.includes("seafarer") || n.includes("srb"))
+          return "SEAMAN_BOOK";
+        if (n.includes("passport")) return "PASSPORT";
+        if (n.includes("coc")) return "COC";
+        if (n.includes("medical") || n.includes("medcert")) return "MEDICAL";
+        if (n.includes("visa")) return "VISA";
+        if (n.includes("resume") || n.includes("cv")) return "RESUME";
+        if (n.includes("training") || n.includes("certificate"))
+          return "TRAINING_CERT";
+        return "OTHER";
+      }
+
+      function renderDocumentList(files) {
+        const docList = document.getElementById("docList");
+        if (!docList) return;
+
+        if (!files || !files.length) {
+          docList.innerHTML = "";
+          return;
+        }
+
+        const rows = files
+          .map((file, index) => {
+            const defaultCode = guessDocCode(file.name);
+            const options = DOCUMENT_TYPES.map((t) => {
+              const selected = t.code === defaultCode ? " selected" : "";
+              return `<option value="${escapeHtml(t.code)}"${selected}>${escapeHtml(t.label)}</option>`;
+            }).join("");
+
+            return (
+              `<div class="doc-row">` +
+              `<div class="doc-file">${escapeHtml(file.name)}</div>` +
+              `<select class="doc-type-select" data-doc-index="${index}">${options}</select>` +
+              `</div>`
+            );
+          })
+          .join("");
+
+        docList.innerHTML = rows;
+      }
+
       const form = document.getElementById("appForm");
       const statusEl = document.getElementById("status");
       const btn = document.getElementById("submitBtn");
+      const documentInput = document.getElementById("documents");
+
+      if (documentInput) {
+        documentInput.addEventListener("change", () => {
+          const files = Array.from(documentInput.files || []);
+          renderDocumentList(files);
+        });
+      }
 
       function showCloseFallback(message) {
         document.body.innerHTML =
@@ -463,20 +540,21 @@
           return;
         }
 
-        const docInput = document.getElementById("documents");
         const selectedFiles = Array.from(
-          docInput && docInput.files ? docInput.files : [],
+          documentInput && documentInput.files ? documentInput.files : [],
         );
-        const defaultDocCode =
-          document.getElementById("doc_code_default").value.trim() || "GENERAL";
-        const rawPrefix =
-          document.getElementById("doc_path_prefix").value.trim() || "web-form";
-        const prefix = rawPrefix.replace(/^\/+|\/+$/g, "") || "web-form";
+        const prefix = "seaman-applications";
         const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const selectedTypes = Array.from(
+          document.querySelectorAll(".doc-type-select"),
+        );
         const documents = selectedFiles.map((file, index) => {
           const safeName = sanitizeFileName(file.name || `file_${index + 1}`);
+          const docCode =
+            (selectedTypes[index] && selectedTypes[index].value) ||
+            guessDocCode(file.name);
           return {
-            doc_code: defaultDocCode,
+            doc_code: docCode,
             storage_bucket: "application-docs",
             storage_path: `${prefix}/${stamp}_${index + 1}_${safeName}`,
             file_name: file.name || safeName,
