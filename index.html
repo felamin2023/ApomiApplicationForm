@@ -318,6 +318,41 @@
             placeholder="Anything you want us to know (optional)"
           ></textarea>
 
+          <div class="divider"></div>
+
+          <label for="documents">Documents (optional)</label>
+          <input
+            id="documents"
+            name="documents"
+            type="file"
+            multiple
+            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+          />
+
+          <div class="grid" style="margin-top: 12px">
+            <div>
+              <label for="doc_code_default">Default document code</label>
+              <input
+                id="doc_code_default"
+                name="doc_code_default"
+                placeholder="e.g., PASSPORT"
+              />
+            </div>
+            <div>
+              <label for="doc_path_prefix">Storage path prefix</label>
+              <input
+                id="doc_path_prefix"
+                name="doc_path_prefix"
+                placeholder="e.g., web-form/uploads"
+              />
+            </div>
+          </div>
+          <div class="hint">
+            Selected files are submitted as document metadata to the backend,
+            using bucket <strong>application-docs</strong>. If your backend does
+            not upload binary files yet, these entries are metadata only.
+          </div>
+
           <div class="actions">
             <button type="submit" id="submitBtn">Submit application</button>
             <div class="status" id="status"></div>
@@ -335,7 +370,8 @@
     <script>
       // 1) Put your n8n webhook URL here (example):
       // const SUBMIT_URL = "https://your-domain.com/webhook/application-form";
-      const SUBMIT_URL = "https://law-andreas-liabilities-organizations.trycloudflare.com/webhook/application-form";
+      const SUBMIT_URL =
+        "https://law-andreas-liabilities-organizations.trycloudflare.com/webhook/application-form";
 
       // Optional: read token and messenger id from URL (example: ?token=abc123&messenger_id=...)
       const params = new URLSearchParams(location.search);
@@ -364,6 +400,13 @@
         const y = toInt(years);
         const m = toInt(months);
         return y * 12 + m;
+      }
+
+      function sanitizeFileName(name) {
+        return String(name || "")
+          .trim()
+          .replace(/[^a-zA-Z0-9._-]+/g, "_")
+          .replace(/^_+|_+$/g, "");
       }
 
       const form = document.getElementById("appForm");
@@ -420,6 +463,28 @@
           return;
         }
 
+        const docInput = document.getElementById("documents");
+        const selectedFiles = Array.from(
+          docInput && docInput.files ? docInput.files : [],
+        );
+        const defaultDocCode =
+          document.getElementById("doc_code_default").value.trim() || "GENERAL";
+        const rawPrefix =
+          document.getElementById("doc_path_prefix").value.trim() || "web-form";
+        const prefix = rawPrefix.replace(/^\/+|\/+$/g, "") || "web-form";
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const documents = selectedFiles.map((file, index) => {
+          const safeName = sanitizeFileName(file.name || `file_${index + 1}`);
+          return {
+            doc_code: defaultDocCode,
+            storage_bucket: "application-docs",
+            storage_path: `${prefix}/${stamp}_${index + 1}_${safeName}`,
+            file_name: file.name || safeName,
+            mime_type: file.type || null,
+            file_size: Number.isFinite(file.size) ? file.size : null,
+          };
+        });
+
         const payload = {
           application_id: token || null,
           token: token || null,
@@ -434,6 +499,7 @@
           email: document.getElementById("email").value.trim() || null,
           source: document.getElementById("source").value,
           notes: document.getElementById("notes").value.trim() || null,
+          documents: documents.length ? documents : null,
           submitted_at_iso: new Date().toISOString(),
         };
 
