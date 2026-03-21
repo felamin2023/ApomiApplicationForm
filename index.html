@@ -544,7 +544,7 @@
           documentInput && documentInput.files ? documentInput.files : [],
         );
         const prefix = "seaman-applications";
-        const ownerRef = sanitizeFileName(token || messengerId || "web-applicant");
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-");
         const selectedTypes = Array.from(
           document.querySelectorAll(".doc-type-select"),
         );
@@ -556,7 +556,7 @@
           return {
             doc_code: docCode,
             storage_bucket: "application-docs",
-            storage_path: `${prefix}/${ownerRef}/${safeName}`,
+            storage_path: `${prefix}/${stamp}_${index + 1}_${safeName}`,
             file_name: file.name || safeName,
             mime_type: file.type || null,
             file_size: Number.isFinite(file.size) ? file.size : null,
