@@ -373,11 +373,27 @@
       </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
     <script>
       // 1) Put your n8n webhook URL here (example):
       // const SUBMIT_URL = "https://your-domain.com/webhook/application-form";
       const SUBMIT_URL =
         "https://alice-stamps-joe-qld.trycloudflare.com/webhook/application-form";
+
+      // OPTIONAL: Supabase client config for direct browser uploads.
+      // If you prefer not to expose keys in the page, leave these empty
+      // and perform uploads from your backend (recommended for production).
+      // Replace with your Supabase project URL and anon/public key when using client-side uploads.
+      const SUPABASE_URL = ""; // e.g. https://xyzabcdef.supabase.co
+      const SUPABASE_ANON_KEY = "";
+
+      const supabaseClient =
+        typeof supabase !== "undefined" &&
+        supabase.createClient &&
+        SUPABASE_URL &&
+        SUPABASE_ANON_KEY
+          ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+          : null;
 
       // Optional: read token and messenger id from URL (example: ?token=abc123&messenger_id=...)
       const params = new URLSearchParams(location.search);
@@ -563,6 +579,42 @@
           };
         });
 
+        // If Supabase client is configured, upload files to the 'application-docs' bucket
+        let uploadedDocs = [];
+        if (selectedFiles.length && supabaseClient) {
+          statusEl.textContent = "Uploading files...";
+          try {
+            const uploads = await Promise.all(
+              selectedFiles.map(async (file, index) => {
+                const doc = documents[index];
+                const path = doc.storage_path;
+
+                const { error: uploadError } = await supabaseClient.storage
+                  .from("application-docs")
+                  .upload(path, file, { cacheControl: "3600", upsert: false });
+
+                if (uploadError) throw uploadError;
+
+                const { data: publicData } = supabaseClient.storage
+                  .from("application-docs")
+                  .getPublicUrl(path);
+
+                doc.public_url = (publicData && publicData.publicUrl) || null;
+                return doc;
+              }),
+            );
+
+            uploadedDocs = uploads;
+          } catch (uErr) {
+            console.error("File upload failed", uErr);
+            statusEl.className = "status err";
+            statusEl.textContent =
+              "File upload failed: " + (uErr.message || String(uErr));
+            btn.disabled = false;
+            return;
+          }
+        }
+
         const payload = {
           application_id: token || null,
           token: token || null,
@@ -577,7 +629,11 @@
           email: document.getElementById("email").value.trim() || null,
           source: document.getElementById("source").value,
           notes: document.getElementById("notes").value.trim() || null,
-          documents: documents.length ? documents : null,
+          documents: uploadedDocs.length
+            ? uploadedDocs
+            : documents.length
+              ? documents
+              : null,
           submitted_at_iso: new Date().toISOString(),
         };
 
