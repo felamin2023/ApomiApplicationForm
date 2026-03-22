@@ -384,8 +384,10 @@
       // If you prefer not to expose keys in the page, leave these empty
       // and perform uploads from your backend (recommended for production).
       // Replace with your Supabase project URL and anon/public key when using client-side uploads.
-      const SUPABASE_URL = ""; // e.g. https://xyzabcdef.supabase.co
-      const SUPABASE_ANON_KEY = "";
+      // Using your local Supabase (from `npx supabase status`)
+      const SUPABASE_URL = "http://127.0.0.1:54321";
+      // Publishable (anon) key shown in your status output
+      const SUPABASE_ANON_KEY = "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH";
 
       const supabaseClient =
         typeof supabase !== "undefined" &&
