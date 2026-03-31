@@ -437,6 +437,7 @@
         { code: "SEAMAN_BOOK", label: "Seaman's Book" },
         { code: "PASSPORT", label: "Passport" },
         { code: "COC", label: "Certificate of Competency (COC)" },
+        { code: "STCW", label: "STCW Certificate" },
         { code: "MEDICAL", label: "Medical Certificate" },
         { code: "VISA", label: "Visa" },
         { code: "RESUME", label: "Resume / CV" },
@@ -459,6 +460,7 @@
           return "SEAMAN_BOOK";
         if (n.includes("passport")) return "PASSPORT";
         if (n.includes("coc")) return "COC";
+        if (n.includes("stcw") || n.includes("basic safety")) return "STCW";
         if (n.includes("medical") || n.includes("medcert")) return "MEDICAL";
         if (n.includes("visa")) return "VISA";
         if (n.includes("resume") || n.includes("cv")) return "RESUME";
