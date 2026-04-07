@@ -395,7 +395,8 @@
       // Supabase (127.0.0.1), disable direct upload and let the webhook handle
       // submission without blocking the user.
       const isLocalSupabase =
-        SUPABASE_URL.includes("127.0.0.1") || SUPABASE_URL.includes("localhost");
+        SUPABASE_URL.includes("127.0.0.1") ||
+        SUPABASE_URL.includes("localhost");
       const isHostedPage = !["localhost", "127.0.0.1"].includes(
         location.hostname,
       );
@@ -553,6 +554,102 @@
         }, 900);
       }
 
+      async function submitWithCorsFallback(url, payload) {
+        let isCrossOrigin = true;
+        try {
+          isCrossOrigin =
+            new URL(url, location.href).origin !== location.origin;
+        } catch (e) {
+          isCrossOrigin = true;
+        }
+
+        const preferNoCors = isHostedPage && isCrossOrigin;
+
+        if (preferNoCors) {
+          // For GitHub Pages -> external webhook, avoid JSON+CORS preflight entirely.
+          // 1) try sendBeacon (best-effort background submit)
+          // 2) fall back to fetch no-cors with text/plain
+          const textBody = JSON.stringify(payload);
+          try {
+            if (navigator.sendBeacon) {
+              const blob = new Blob([textBody], {
+                type: "text/plain;charset=UTF-8",
+              });
+              const queued = navigator.sendBeacon(url, blob);
+              if (queued) return { mode: "beacon", responseData: null };
+            }
+          } catch (e) {
+            // continue to no-cors fetch fallback
+          }
+
+          try {
+            await fetch(url, {
+              method: "POST",
+              mode: "no-cors",
+              headers: { "Content-Type": "text/plain;charset=UTF-8" },
+              body: textBody,
+            });
+            return { mode: "no-cors", responseData: null };
+          } catch (e) {
+            throw new Error(
+              "Failed to reach submit webhook. Check that your tunnel URL is active and n8n workflow is running.",
+            );
+          }
+        }
+
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          const responseText = await res.text();
+          if (!res.ok) {
+            throw new Error(
+              "Submit failed (" +
+                res.status +
+                "): " +
+                (responseText || "No response body"),
+            );
+          }
+
+          let responseData = null;
+          if (responseText && responseText.trim()) {
+            try {
+              responseData = JSON.parse(responseText);
+            } catch (parseErr) {
+              responseData = null;
+            }
+          }
+
+          if (responseData && responseData.ok === false) {
+            throw new Error(responseData.error || "Submission failed.");
+          }
+
+          return { mode: "cors", responseData };
+        } catch (err) {
+          const msg = String((err && err.message) || err || "").toLowerCase();
+          const isCorsLike =
+            msg.includes("failed to fetch") ||
+            msg.includes("cors") ||
+            msg.includes("preflight") ||
+            msg.includes("access-control-allow-origin");
+
+          if (!isCorsLike) throw err;
+
+          // Fallback when CORS is misconfigured.
+          await fetch(url, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "text/plain;charset=UTF-8" },
+            body: JSON.stringify(payload),
+          });
+
+          return { mode: "no-cors", responseData: null };
+        }
+      }
+
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
         statusEl.className = "status";
@@ -680,37 +777,11 @@
         try {
           btn.disabled = true;
           statusEl.textContent = "Submitting...";
-
-          const res = await fetch(SUBMIT_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-
-          const responseText = await res.text();
-
-          if (!res.ok) {
-            throw new Error(
-              "Submit failed (" +
-                res.status +
-                "): " +
-                (responseText || "No response body"),
-            );
-          }
-
-          let responseData = null;
-          if (responseText && responseText.trim()) {
-            try {
-              responseData = JSON.parse(responseText);
-            } catch (parseErr) {
-              responseData = null;
-            }
-          }
-
-          // n8n can return HTTP 200 with an application-level error payload.
-          if (responseData && responseData.ok === false) {
-            throw new Error(responseData.error || "Submission failed.");
-          }
+          const submitResult = await submitWithCorsFallback(
+            SUBMIT_URL,
+            payload,
+          );
+          const responseData = submitResult.responseData;
 
           const successMessage =
             responseData && responseData.message
