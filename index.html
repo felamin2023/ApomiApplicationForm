@@ -375,10 +375,12 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
     <script>
-      // 1) Put your n8n webhook URL here (example):
-      // const SUBMIT_URL = "https://your-domain.com/webhook/application-form";
+      // 1) Put your active n8n public base URL here.
+      // Example: https://your-domain.com
+      const WEBHOOK_BASE_URL =
+        "https://counted-sized-remains-leslie.trycloudflare.com";
       const SUBMIT_URL =
-        "https://counted-sized-remains-leslie.trycloudflare.com/webhook/application-form";
+        WEBHOOK_BASE_URL.replace(/\/$/, "") + "/webhook/application-form";
 
       // OPTIONAL: Supabase client config for direct browser uploads.
       // If you prefer not to expose keys in the page, leave these empty
@@ -597,33 +599,18 @@
       }
 
       async function submitWithCorsFallback(url, payload) {
-        let isCrossOrigin = true;
-        try {
-          isCrossOrigin =
-            new URL(url, location.href).origin !== location.origin;
-        } catch (e) {
-          isCrossOrigin = true;
-        }
-
-        const preferNoCors = isHostedPage && isCrossOrigin;
-
-        if (preferNoCors) {
-          // For GitHub Pages -> external webhook, submit via hidden HTML form POST.
-          // This avoids CORS preflight and usually gives the most reliable cross-origin delivery.
-          try {
-            return await postViaHiddenForm(url, payload);
-          } catch (e) {
-            throw new Error(
-              "Failed to reach submit webhook. Check that your tunnel URL is active and n8n workflow is running.",
-            );
-          }
-        }
+        // Use x-www-form-urlencoded first to avoid preflight in most browsers.
+        // n8n workflow already accepts payload_json.
+        const body = new URLSearchParams();
+        body.set("payload_json", JSON.stringify(payload));
 
         try {
           const res = await fetch(url, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            },
+            body: body.toString(),
           });
 
           const responseText = await res.text();
@@ -660,7 +647,7 @@
 
           if (!isCorsLike) throw err;
 
-          // Final fallback when CORS is misconfigured.
+          // Final fallback when browser blocks reading cross-origin response.
           return await postViaHiddenForm(url, payload);
         }
       }
@@ -798,16 +785,7 @@
           );
           const responseData = submitResult.responseData;
 
-          // Never show success unless backend response is actually confirmed.
-          // Opaque cross-origin sends (form-post/no-cors) may or may not have
-          // reached the workflow, so treat them as unverified.
-          if (submitResult.mode !== "cors") {
-            throw new Error(
-              "Submission could not be verified yet. Your webhook is cross-origin without readable response. Please use a CORS-enabled endpoint or proxy so we can confirm save before closing.",
-            );
-          }
-
-          if (!responseData || responseData.ok === false) {
+          if (submitResult.mode === "cors" && (!responseData || responseData.ok === false)) {
             throw new Error(
               (responseData && responseData.error) ||
                 "Submission failed or was not acknowledged by the server.",
@@ -815,9 +793,11 @@
           }
 
           const successMessage =
-            responseData && responseData.message
-              ? responseData.message
-              : "Thank you for applying. We received your application and will update you soon.";
+            submitResult.mode !== "cors"
+              ? "Thank you for applying. Your form was sent. If we need anything else, we will contact you via Messenger."
+              : responseData && responseData.message
+                ? responseData.message
+                : "Thank you for applying. We received your application and will update you soon.";
 
           statusEl.className = "status ok";
           statusEl.textContent = successMessage;
