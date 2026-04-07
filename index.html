@@ -390,7 +390,19 @@
       const SUPABASE_ANON_KEY =
         "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH";
 
+      // Direct browser upload is only safe/reliable when the browser can reach
+      // the configured Supabase URL. For a GitHub Pages form using local
+      // Supabase (127.0.0.1), disable direct upload and let the webhook handle
+      // submission without blocking the user.
+      const isLocalSupabase =
+        SUPABASE_URL.includes("127.0.0.1") || SUPABASE_URL.includes("localhost");
+      const isHostedPage = !["localhost", "127.0.0.1"].includes(
+        location.hostname,
+      );
+      const ENABLE_CLIENT_UPLOADS = !(isLocalSupabase && isHostedPage);
+
       const supabaseClient =
+        ENABLE_CLIENT_UPLOADS &&
         typeof supabase !== "undefined" &&
         supabase.createClient &&
         SUPABASE_URL &&
@@ -589,8 +601,10 @@
           };
         });
 
-        // If Supabase client is configured, upload files to the 'application-docs' bucket
+        // If Supabase client is configured, upload files to the 'application-docs' bucket.
+        // If it fails, keep submission flowing and let backend process without docs.
         let uploadedDocs = [];
+        let uploadWarning = null;
         if (selectedFiles.length && supabaseClient) {
           statusEl.textContent = "Uploading files...";
           try {
@@ -617,11 +631,26 @@
             uploadedDocs = uploads;
           } catch (uErr) {
             console.error("File upload failed", uErr);
-            statusEl.className = "status err";
-            statusEl.textContent =
-              "File upload failed: " + (uErr.message || String(uErr));
-            btn.disabled = false;
-            return;
+            uploadWarning =
+              "Document upload skipped for now: " +
+              (uErr.message || String(uErr));
+          }
+        } else if (selectedFiles.length && !ENABLE_CLIENT_UPLOADS) {
+          uploadWarning =
+            "Document upload is temporarily disabled in this hosted setup; form data will still be submitted.";
+        } else if (selectedFiles.length && !supabaseClient) {
+          uploadWarning =
+            "Document upload is unavailable right now; form data will still be submitted.";
+        }
+
+        if (uploadWarning) {
+          statusEl.className = "status err";
+          statusEl.textContent = uploadWarning;
+          // Briefly show warning, then proceed with submit.
+          await new Promise((resolve) => setTimeout(resolve, 900));
+          if (!btn.disabled) {
+            statusEl.className = "status";
+            statusEl.textContent = "";
           }
         }
 
