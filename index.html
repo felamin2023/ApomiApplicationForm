@@ -554,6 +554,48 @@
         }, 900);
       }
 
+      function postViaHiddenForm(url, payload) {
+        return new Promise((resolve, reject) => {
+          try {
+            const frameName = "apomi_submit_frame";
+            let frame = document.getElementById(frameName);
+            if (!frame) {
+              frame = document.createElement("iframe");
+              frame.id = frameName;
+              frame.name = frameName;
+              frame.style.display = "none";
+              document.body.appendChild(frame);
+            }
+
+            const formEl = document.createElement("form");
+            formEl.method = "POST";
+            formEl.action = url;
+            formEl.target = frameName;
+            formEl.style.display = "none";
+
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = "payload_json";
+            input.value = JSON.stringify(payload);
+            formEl.appendChild(input);
+
+            document.body.appendChild(formEl);
+            formEl.submit();
+
+            // We cannot inspect cross-origin response, but this reliably sends POST
+            // without CORS preflight.
+            setTimeout(() => {
+              try {
+                formEl.remove();
+              } catch (e) {}
+              resolve({ mode: "form-post", responseData: null });
+            }, 450);
+          } catch (e) {
+            reject(e);
+          }
+        });
+      }
+
       async function submitWithCorsFallback(url, payload) {
         let isCrossOrigin = true;
         try {
@@ -566,30 +608,10 @@
         const preferNoCors = isHostedPage && isCrossOrigin;
 
         if (preferNoCors) {
-          // For GitHub Pages -> external webhook, avoid JSON+CORS preflight entirely.
-          // 1) try sendBeacon (best-effort background submit)
-          // 2) fall back to fetch no-cors with text/plain
-          const textBody = JSON.stringify(payload);
+          // For GitHub Pages -> external webhook, submit via hidden HTML form POST.
+          // This avoids CORS preflight and usually gives the most reliable cross-origin delivery.
           try {
-            if (navigator.sendBeacon) {
-              const blob = new Blob([textBody], {
-                type: "text/plain;charset=UTF-8",
-              });
-              const queued = navigator.sendBeacon(url, blob);
-              if (queued) return { mode: "beacon", responseData: null };
-            }
-          } catch (e) {
-            // continue to no-cors fetch fallback
-          }
-
-          try {
-            await fetch(url, {
-              method: "POST",
-              mode: "no-cors",
-              headers: { "Content-Type": "text/plain;charset=UTF-8" },
-              body: textBody,
-            });
-            return { mode: "no-cors", responseData: null };
+            return await postViaHiddenForm(url, payload);
           } catch (e) {
             throw new Error(
               "Failed to reach submit webhook. Check that your tunnel URL is active and n8n workflow is running.",
@@ -638,15 +660,8 @@
 
           if (!isCorsLike) throw err;
 
-          // Fallback when CORS is misconfigured.
-          await fetch(url, {
-            method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "text/plain;charset=UTF-8" },
-            body: JSON.stringify(payload),
-          });
-
-          return { mode: "no-cors", responseData: null };
+          // Final fallback when CORS is misconfigured.
+          return await postViaHiddenForm(url, payload);
         }
       }
 
