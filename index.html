@@ -798,6 +798,22 @@
           );
           const responseData = submitResult.responseData;
 
+          // Never show success unless backend response is actually confirmed.
+          // Opaque cross-origin sends (form-post/no-cors) may or may not have
+          // reached the workflow, so treat them as unverified.
+          if (submitResult.mode !== "cors") {
+            throw new Error(
+              "Submission could not be verified yet. Your webhook is cross-origin without readable response. Please use a CORS-enabled endpoint or proxy so we can confirm save before closing.",
+            );
+          }
+
+          if (!responseData || responseData.ok === false) {
+            throw new Error(
+              (responseData && responseData.error) ||
+                "Submission failed or was not acknowledged by the server.",
+            );
+          }
+
           const successMessage =
             responseData && responseData.message
               ? responseData.message
