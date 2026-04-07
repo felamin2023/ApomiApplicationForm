@@ -388,8 +388,11 @@
       const SUPABASE_URL = "http://127.0.0.1:54321";
       // Publishable (anon) key shown in your status output
       const SUPABASE_ANON_KEY = "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH";
+      // Keep false unless your storage bucket has anon INSERT policy configured.
+      const ENABLE_CLIENT_UPLOADS = true;
 
       const supabaseClient =
+        ENABLE_CLIENT_UPLOADS &&
         typeof supabase !== "undefined" &&
         supabase.createClient &&
         SUPABASE_URL &&
@@ -583,7 +586,8 @@
           };
         });
 
-        // If Supabase client is configured, upload files to the 'application-docs' bucket
+        // If Supabase client is configured, upload files to the 'application-docs' bucket.
+        let uploadWarning = null;
         let uploadedDocs = [];
         if (selectedFiles.length && supabaseClient) {
           statusEl.textContent = "Uploading files...";
@@ -611,11 +615,18 @@
             uploadedDocs = uploads;
           } catch (uErr) {
             console.error("File upload failed", uErr);
-            statusEl.className = "status err";
-            statusEl.textContent =
-              "File upload failed: " + (uErr.message || String(uErr));
-            btn.disabled = false;
-            return;
+            const msg = (uErr && uErr.message ? uErr.message : String(uErr)) || "";
+            if (/row-level security policy/i.test(msg)) {
+              // Continue with metadata-only submission when storage RLS blocks direct browser uploads.
+              uploadWarning =
+                "Files could not be uploaded from browser due to storage policy. Submission will continue without uploaded files.";
+              uploadedDocs = [];
+            } else {
+              statusEl.className = "status err";
+              statusEl.textContent = "File upload failed: " + msg;
+              btn.disabled = false;
+              return;
+            }
           }
         }
 
@@ -682,8 +693,11 @@
               : "Thank you for applying. We received your application and will update you soon.";
 
           statusEl.className = "status ok";
-          statusEl.textContent = successMessage;
+          statusEl.textContent = uploadWarning
+            ? successMessage + " " + uploadWarning
+            : successMessage;
           form.reset();
+          renderDocumentList([]);
 
           // If backend did not explicitly disable it, attempt to close the page.
           if (!responseData || responseData.auto_close !== false) {
