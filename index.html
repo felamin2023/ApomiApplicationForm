@@ -556,48 +556,6 @@
         }, 900);
       }
 
-      function postViaHiddenForm(url, payload) {
-        return new Promise((resolve, reject) => {
-          try {
-            const frameName = "apomi_submit_frame";
-            let frame = document.getElementById(frameName);
-            if (!frame) {
-              frame = document.createElement("iframe");
-              frame.id = frameName;
-              frame.name = frameName;
-              frame.style.display = "none";
-              document.body.appendChild(frame);
-            }
-
-            const formEl = document.createElement("form");
-            formEl.method = "POST";
-            formEl.action = url;
-            formEl.target = frameName;
-            formEl.style.display = "none";
-
-            const input = document.createElement("input");
-            input.type = "hidden";
-            input.name = "payload_json";
-            input.value = JSON.stringify(payload);
-            formEl.appendChild(input);
-
-            document.body.appendChild(formEl);
-            formEl.submit();
-
-            // We cannot inspect cross-origin response, but this reliably sends POST
-            // without CORS preflight.
-            setTimeout(() => {
-              try {
-                formEl.remove();
-              } catch (e) {}
-              resolve({ mode: "form-post", responseData: null });
-            }, 450);
-          } catch (e) {
-            reject(e);
-          }
-        });
-      }
-
       async function submitWithCorsFallback(url, payload) {
         // Use x-www-form-urlencoded first to avoid preflight in most browsers.
         // n8n workflow already accepts payload_json.
@@ -623,17 +581,20 @@
             );
           }
 
-          let responseData = null;
-          if (responseText && responseText.trim()) {
-            try {
-              responseData = JSON.parse(responseText);
-            } catch (parseErr) {
-              responseData = null;
-            }
+          let responseData;
+          try {
+            responseData = JSON.parse(responseText || "{}");
+          } catch (parseErr) {
+            throw new Error(
+              "Submission was not verified: server response was not valid JSON.",
+            );
           }
 
-          if (responseData && responseData.ok === false) {
-            throw new Error(responseData.error || "Submission failed.");
+          if (!responseData || responseData.ok !== true) {
+            throw new Error(
+              (responseData && responseData.error) ||
+                "Submission was not verified by the server.",
+            );
           }
 
           return { mode: "cors", responseData };
@@ -647,8 +608,9 @@
 
           if (!isCorsLike) throw err;
 
-          // Final fallback when browser blocks reading cross-origin response.
-          return await postViaHiddenForm(url, payload);
+          throw new Error(
+            "Submission could not be verified. The browser could not confirm a response from the webhook (network/CORS). Please retry in a few seconds.",
+          );
         }
       }
 
@@ -785,19 +747,10 @@
           );
           const responseData = submitResult.responseData;
 
-          if (submitResult.mode === "cors" && (!responseData || responseData.ok === false)) {
-            throw new Error(
-              (responseData && responseData.error) ||
-                "Submission failed or was not acknowledged by the server.",
-            );
-          }
-
           const successMessage =
-            submitResult.mode !== "cors"
-              ? "Thank you for applying. Your form was sent. If we need anything else, we will contact you via Messenger."
-              : responseData && responseData.message
-                ? responseData.message
-                : "Thank you for applying. We received your application and will update you soon.";
+            responseData && responseData.message
+              ? responseData.message
+              : "Thank you for applying. We received your application and will update you soon.";
 
           statusEl.className = "status ok";
           statusEl.textContent = successMessage;
