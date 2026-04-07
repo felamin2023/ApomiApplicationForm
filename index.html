@@ -375,12 +375,10 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
     <script>
-      // 1) Put your active n8n public base URL here.
-      // Example: https://your-domain.com
-      const WEBHOOK_BASE_URL =
-        "https://begun-dodge-across-highway.trycloudflare.com";
+      // 1) Put your n8n webhook URL here (example):
+      // const SUBMIT_URL = "https://your-domain.com/webhook/application-form";
       const SUBMIT_URL =
-        WEBHOOK_BASE_URL.replace(/\/$/, "") + "/webhook/application-form";
+        "https://ltd-string-held-naval.trycloudflare.com/webhook/application-form";
 
       // OPTIONAL: Supabase client config for direct browser uploads.
       // If you prefer not to expose keys in the page, leave these empty
@@ -389,23 +387,9 @@
       // Using your local Supabase (from `npx supabase status`)
       const SUPABASE_URL = "http://127.0.0.1:54321";
       // Publishable (anon) key shown in your status output
-      const SUPABASE_ANON_KEY =
-        "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH";
-
-      // Direct browser upload is only safe/reliable when the browser can reach
-      // the configured Supabase URL. For a GitHub Pages form using local
-      // Supabase (127.0.0.1), disable direct upload and let the webhook handle
-      // submission without blocking the user.
-      const isLocalSupabase =
-        SUPABASE_URL.includes("127.0.0.1") ||
-        SUPABASE_URL.includes("localhost");
-      const isHostedPage = !["localhost", "127.0.0.1"].includes(
-        location.hostname,
-      );
-      const ENABLE_CLIENT_UPLOADS = !(isLocalSupabase && isHostedPage);
+      const SUPABASE_ANON_KEY = "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH";
 
       const supabaseClient =
-        ENABLE_CLIENT_UPLOADS &&
         typeof supabase !== "undefined" &&
         supabase.createClient &&
         SUPABASE_URL &&
@@ -416,10 +400,6 @@
       // Optional: read token and messenger id from URL (example: ?token=abc123&messenger_id=...)
       const params = new URLSearchParams(location.search);
       const token = params.get("token");
-      const applicationId =
-        params.get("application_id") || params.get("app_id") || null;
-      const jobOpeningId =
-        params.get("job_opening_id") || params.get("job_id") || null;
       const messengerId =
         params.get("messenger_id") ||
         params.get("messenger") ||
@@ -430,7 +410,6 @@
         tokenPill.style.display = "";
         const parts = [];
         if (token) parts.push("token: " + token);
-        if (applicationId) parts.push("application_id: " + applicationId);
         if (messengerId) parts.push("messenger_id: " + messengerId);
         tokenPill.textContent = parts.join(" • ");
       }
@@ -556,64 +535,6 @@
         }, 900);
       }
 
-      async function submitWithCorsFallback(url, payload) {
-        // Use x-www-form-urlencoded first to avoid preflight in most browsers.
-        // n8n workflow already accepts payload_json.
-        const body = new URLSearchParams();
-        body.set("payload_json", JSON.stringify(payload));
-
-        try {
-          const res = await fetch(url, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-            },
-            body: body.toString(),
-          });
-
-          const responseText = await res.text();
-          if (!res.ok) {
-            throw new Error(
-              "Submit failed (" +
-                res.status +
-                "): " +
-                (responseText || "No response body"),
-            );
-          }
-
-          let responseData;
-          try {
-            responseData = JSON.parse(responseText || "{}");
-          } catch (parseErr) {
-            throw new Error(
-              "Submission was not verified: server response was not valid JSON.",
-            );
-          }
-
-          if (!responseData || responseData.ok !== true) {
-            throw new Error(
-              (responseData && responseData.error) ||
-                "Submission was not verified by the server.",
-            );
-          }
-
-          return { mode: "cors", responseData };
-        } catch (err) {
-          const msg = String((err && err.message) || err || "").toLowerCase();
-          const isCorsLike =
-            msg.includes("failed to fetch") ||
-            msg.includes("cors") ||
-            msg.includes("preflight") ||
-            msg.includes("access-control-allow-origin");
-
-          if (!isCorsLike) throw err;
-
-          throw new Error(
-            "Submission could not be verified. The browser could not confirm a response from the webhook (network/CORS). Please retry in a few seconds.",
-          );
-        }
-      }
-
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
         statusEl.className = "status";
@@ -662,10 +583,8 @@
           };
         });
 
-        // If Supabase client is configured, upload files to the 'application-docs' bucket.
-        // If it fails, keep submission flowing and let backend process without docs.
+        // If Supabase client is configured, upload files to the 'application-docs' bucket
         let uploadedDocs = [];
-        let uploadWarning = null;
         if (selectedFiles.length && supabaseClient) {
           statusEl.textContent = "Uploading files...";
           try {
@@ -692,32 +611,16 @@
             uploadedDocs = uploads;
           } catch (uErr) {
             console.error("File upload failed", uErr);
-            uploadWarning =
-              "Document upload skipped for now: " +
-              (uErr.message || String(uErr));
-          }
-        } else if (selectedFiles.length && !ENABLE_CLIENT_UPLOADS) {
-          uploadWarning =
-            "Document upload is temporarily disabled in this hosted setup; form data will still be submitted.";
-        } else if (selectedFiles.length && !supabaseClient) {
-          uploadWarning =
-            "Document upload is unavailable right now; form data will still be submitted.";
-        }
-
-        if (uploadWarning) {
-          statusEl.className = "status err";
-          statusEl.textContent = uploadWarning;
-          // Briefly show warning, then proceed with submit.
-          await new Promise((resolve) => setTimeout(resolve, 900));
-          if (!btn.disabled) {
-            statusEl.className = "status";
-            statusEl.textContent = "";
+            statusEl.className = "status err";
+            statusEl.textContent =
+              "File upload failed: " + (uErr.message || String(uErr));
+            btn.disabled = false;
+            return;
           }
         }
 
         const payload = {
-          application_id: applicationId || null,
-          job_opening_id: jobOpeningId || null,
+          application_id: token || null,
           token: token || null,
           messenger_id: messengerId || null,
           full_name,
@@ -741,11 +644,37 @@
         try {
           btn.disabled = true;
           statusEl.textContent = "Submitting...";
-          const submitResult = await submitWithCorsFallback(
-            SUBMIT_URL,
-            payload,
-          );
-          const responseData = submitResult.responseData;
+
+          const res = await fetch(SUBMIT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          const responseText = await res.text();
+
+          if (!res.ok) {
+            throw new Error(
+              "Submit failed (" +
+                res.status +
+                "): " +
+                (responseText || "No response body"),
+            );
+          }
+
+          let responseData = null;
+          if (responseText && responseText.trim()) {
+            try {
+              responseData = JSON.parse(responseText);
+            } catch (parseErr) {
+              responseData = null;
+            }
+          }
+
+          // n8n can return HTTP 200 with an application-level error payload.
+          if (responseData && responseData.ok === false) {
+            throw new Error(responseData.error || "Submission failed.");
+          }
 
           const successMessage =
             responseData && responseData.message
