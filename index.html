@@ -638,7 +638,11 @@
                 const formData = new FormData();
                 formData.append("payload_json", JSON.stringify(payload));
                 selectedFiles.forEach((file, index) => {
-                  formData.append(`file_${index}`, file, file.name || `file_${index + 1}`);
+                  formData.append(
+                    `file_${index}`,
+                    file,
+                    file.name || `file_${index + 1}`,
+                  );
                 });
                 return formData;
               })()
