@@ -392,10 +392,35 @@
       const SUPABASE_ANON_KEY =
         "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH";
       // Keep false unless your storage bucket has anon INSERT policy configured.
+      // This is automatically forced off on non-local pages when SUPABASE_URL is localhost.
       const ENABLE_CLIENT_UPLOADS = true;
 
-      const supabaseClient =
+      function isLocalHostPage() {
+        const host = (location.hostname || "").toLowerCase();
+        return (
+          host === "localhost" ||
+          host === "127.0.0.1" ||
+          host === "[::1]" ||
+          host.endsWith(".localhost")
+        );
+      }
+
+      function isLoopbackSupabase(url) {
+        try {
+          const u = new URL(url);
+          const host = (u.hostname || "").toLowerCase();
+          return host === "localhost" || host === "127.0.0.1" || host === "::1";
+        } catch (e) {
+          return false;
+        }
+      }
+
+      const SHOULD_ENABLE_CLIENT_UPLOADS =
         ENABLE_CLIENT_UPLOADS &&
+        (!isLoopbackSupabase(SUPABASE_URL) || isLocalHostPage());
+
+      const supabaseClient =
+        SHOULD_ENABLE_CLIENT_UPLOADS &&
         typeof supabase !== "undefined" &&
         supabase.createClient &&
         SUPABASE_URL &&
@@ -654,10 +679,10 @@
             console.error("File upload failed", uErr);
             const msg =
               (uErr && uErr.message ? uErr.message : String(uErr)) || "";
-            if (/row-level security policy/i.test(msg)) {
-              // Continue with metadata-only submission when storage RLS blocks direct browser uploads.
+            if (/row-level security policy|failed to fetch|err_connection_refused|network/i.test(msg)) {
+              // Continue with metadata-only submission when storage policy or connectivity blocks direct browser uploads.
               uploadWarning =
-                "Files could not be uploaded from browser due to storage policy. Submission will continue without uploaded files.";
+                "Files could not be uploaded from browser due to storage policy or connectivity. Submission will continue without uploaded files.";
               uploadedDocs = [];
             } else {
               statusEl.className = "status err";
