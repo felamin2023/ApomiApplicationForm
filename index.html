@@ -651,6 +651,10 @@
         // If Supabase client is configured, upload files to the 'application-docs' bucket.
         let uploadWarning = null;
         let uploadedDocs = [];
+        if (selectedFiles.length && !supabaseClient) {
+          uploadWarning =
+            "File upload is disabled on this page because Supabase is set to localhost. Selected files were not uploaded.";
+        }
         if (selectedFiles.length && supabaseClient) {
           statusEl.textContent = "Uploading files...";
           try {
@@ -707,11 +711,7 @@
           email: document.getElementById("email").value.trim() || null,
           source: document.getElementById("source").value,
           notes: document.getElementById("notes").value.trim() || null,
-          documents: uploadedDocs.length
-            ? uploadedDocs
-            : documents.length
-              ? documents
-              : null,
+          documents: uploadedDocs.length ? uploadedDocs : null,
           submitted_at_iso: new Date().toISOString(),
         };
 
