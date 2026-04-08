@@ -382,51 +382,9 @@
         "http://127.0.0.1:5678/webhook/form-application",
       ];
 
-      // OPTIONAL: Supabase client config for direct browser uploads.
-      // If you prefer not to expose keys in the page, leave these empty
-      // and perform uploads from your backend (recommended for production).
-      // Replace with your Supabase project URL and anon/public key when using client-side uploads.
-      // Using your local Supabase (from `npx supabase status`)
-      const SUPABASE_URL = "http://127.0.0.1:54321";
-      // Publishable (anon) key shown in your status output
-      const SUPABASE_ANON_KEY =
-        "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH";
-      // Keep false unless your storage bucket has anon INSERT policy configured.
-      // This is automatically forced off on non-local pages when SUPABASE_URL is localhost.
-      const ENABLE_CLIENT_UPLOADS = true;
-
-      function isLocalHostPage() {
-        const host = (location.hostname || "").toLowerCase();
-        return (
-          host === "localhost" ||
-          host === "127.0.0.1" ||
-          host === "[::1]" ||
-          host.endsWith(".localhost")
-        );
-      }
-
-      function isLoopbackSupabase(url) {
-        try {
-          const u = new URL(url);
-          const host = (u.hostname || "").toLowerCase();
-          return host === "localhost" || host === "127.0.0.1" || host === "::1";
-        } catch (e) {
-          return false;
-        }
-      }
-
-      const SHOULD_ENABLE_CLIENT_UPLOADS =
-        ENABLE_CLIENT_UPLOADS &&
-        (!isLoopbackSupabase(SUPABASE_URL) || isLocalHostPage());
-
-      const supabaseClient =
-        SHOULD_ENABLE_CLIENT_UPLOADS &&
-        typeof supabase !== "undefined" &&
-        supabase.createClient &&
-        SUPABASE_URL &&
-        SUPABASE_ANON_KEY
-          ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-          : null;
+      // Files are sent to n8n webhook as multipart/form-data.
+      // n8n will upload binaries to Supabase Storage server-side.
+      const ENABLE_BACKEND_FILE_UPLOADS = true;
 
       // Optional: read token and messenger id from URL (example: ?token=abc123&messenger_id=...)
       const params = new URLSearchParams(location.search);
@@ -570,16 +528,24 @@
         }, 900);
       }
 
-      async function postToWebhookWithFailover(payload) {
+      async function postToWebhookWithFailover(requestBody, options = {}) {
+        const isMultipart = !!options.isMultipart;
         let lastNetworkError = null;
 
         for (const url of SUBMIT_URLS) {
           try {
-            const res = await fetch(url, {
+            const req = {
               method: "POST",
+              body: requestBody,
+            };
+
+            if (!isMultipart) {
               // Use a simple request content type to avoid browser preflight.
-              headers: { "Content-Type": "text/plain;charset=UTF-8" },
-              body: JSON.stringify(payload),
+              req.headers = { "Content-Type": "text/plain;charset=UTF-8" };
+            }
+
+            const res = await fetch(url, {
+              ...req,
             });
 
             return { res, url };
@@ -648,55 +614,6 @@
           };
         });
 
-        // If Supabase client is configured, upload files to the 'application-docs' bucket.
-        let uploadWarning = null;
-        let uploadedDocs = [];
-        if (selectedFiles.length && !supabaseClient) {
-          uploadWarning =
-            "File upload is disabled on this page because Supabase is set to localhost. Selected files were not uploaded.";
-        }
-        if (selectedFiles.length && supabaseClient) {
-          statusEl.textContent = "Uploading files...";
-          try {
-            const uploads = await Promise.all(
-              selectedFiles.map(async (file, index) => {
-                const doc = documents[index];
-                const path = doc.storage_path;
-
-                const { error: uploadError } = await supabaseClient.storage
-                  .from("application-docs")
-                  .upload(path, file, { cacheControl: "3600", upsert: false });
-
-                if (uploadError) throw uploadError;
-
-                const { data: publicData } = supabaseClient.storage
-                  .from("application-docs")
-                  .getPublicUrl(path);
-
-                doc.public_url = (publicData && publicData.publicUrl) || null;
-                return doc;
-              }),
-            );
-
-            uploadedDocs = uploads;
-          } catch (uErr) {
-            console.error("File upload failed", uErr);
-            const msg =
-              (uErr && uErr.message ? uErr.message : String(uErr)) || "";
-            if (/row-level security policy|failed to fetch|err_connection_refused|network/i.test(msg)) {
-              // Continue with metadata-only submission when storage policy or connectivity blocks direct browser uploads.
-              uploadWarning =
-                "Files could not be uploaded from browser due to storage policy or connectivity. Submission will continue without uploaded files.";
-              uploadedDocs = [];
-            } else {
-              statusEl.className = "status err";
-              statusEl.textContent = "File upload failed: " + msg;
-              btn.disabled = false;
-              return;
-            }
-          }
-        }
-
         const payload = {
           application_id: token || null,
           token: token || null,
@@ -711,15 +628,33 @@
           email: document.getElementById("email").value.trim() || null,
           source: document.getElementById("source").value,
           notes: document.getElementById("notes").value.trim() || null,
-          documents: uploadedDocs.length ? uploadedDocs : null,
+          documents: documents.length ? documents : null,
           submitted_at_iso: new Date().toISOString(),
         };
+
+        const requestBody =
+          ENABLE_BACKEND_FILE_UPLOADS && selectedFiles.length
+            ? (() => {
+                const formData = new FormData();
+                formData.append("payload_json", JSON.stringify(payload));
+                selectedFiles.forEach((file, index) => {
+                  formData.append(`file_${index}`, file, file.name || `file_${index + 1}`);
+                });
+                return formData;
+              })()
+            : JSON.stringify(payload);
 
         try {
           btn.disabled = true;
           statusEl.textContent = "Submitting...";
 
-          const { res } = await postToWebhookWithFailover(payload);
+          const { res } = await postToWebhookWithFailover(requestBody, {
+            isMultipart:
+              ENABLE_BACKEND_FILE_UPLOADS &&
+              selectedFiles.length > 0 &&
+              typeof FormData !== "undefined" &&
+              requestBody instanceof FormData,
+          });
 
           const responseText = await res.text();
 
@@ -752,9 +687,7 @@
               : "Thank you for applying. We received your application and will update you soon.";
 
           statusEl.className = "status ok";
-          statusEl.textContent = uploadWarning
-            ? successMessage + " " + uploadWarning
-            : successMessage;
+          statusEl.textContent = successMessage;
           form.reset();
           renderDocumentList([]);
 
