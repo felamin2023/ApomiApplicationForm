@@ -254,12 +254,14 @@
 
             <div>
               <label for="rank">Rank / Position applying for *</label>
-              <input
+              <select
                 id="rank"
                 name="rank"
-                placeholder="e.g., Able Seaman / Oiler / 2nd Engineer"
                 required
-              />
+              >
+                <option value="">-- Select a rank --</option>
+              </select>
+              <div class="hint" id="rankHint" style="display: none; color: var(--danger);">Failed to load ranks. Please try again.</div>
             </div>
 
             <div>
@@ -432,6 +434,59 @@
         { code: "TRAINING_CERT", label: "Training Certificate" },
         { code: "OTHER", label: "Other" },
       ];
+
+      // Fetch ranks from Supabase and populate dropdown
+      async function loadRanksFromSupabase() {
+        const rankSelect = document.getElementById("rank");
+        const rankHint = document.getElementById("rankHint");
+        
+        try {
+          // Try to fetch from public Supabase endpoint (adjust with your Supabase URL)
+          const supabaseUrl = "https://bsktdcthkklwysvhfbrx.supabase.co";
+          const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJza3RkY3Roa2tsd3lzdmhmYnJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzEyNTcyMTcsImV4cCI6MjA0NjgzMzIxN30.gNJ-Z96KqmPNdIdmhSMKKZONhc2b5e-bNKqHXfZQGOY";
+          
+          const url = new URL(`${supabaseUrl}/rest/v1/m_rank`);
+          url.searchParams.append("is_active", "eq.true");
+          url.searchParams.append("order", "name.asc");
+          
+          const response = await fetch(url.toString(), {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${anonKey}`,
+              "apikey": anonKey,
+            },
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          const ranks = await response.json();
+          
+          // Clear default option
+          rankSelect.innerHTML = '<option value="">-- Select a rank --</option>';
+          
+          // Add ranks to dropdown
+          ranks.forEach((rank) => {
+            const option = document.createElement("option");
+            option.value = rank.code; // Use code as value (e.g., "3/O")
+            option.textContent = `${rank.code} - ${rank.name}`; // Display code + name (e.g., "3/O - Third Officer")
+            rankSelect.appendChild(option);
+          });
+          
+          rankHint.style.display = "none";
+        } catch (err) {
+          console.error("Failed to load ranks:", err);
+          rankHint.style.display = "block";
+          rankHint.textContent = `Failed to load ranks. Please refresh the page. Details: ${err.message}`;
+        }
+      }
+
+      // Load ranks when page loads
+      window.addEventListener("DOMContentLoaded", () => {
+        loadRanksFromSupabase();
+      });
 
       function escapeHtml(value) {
         return String(value || "")
@@ -622,7 +677,7 @@
         const documents = buildDocumentManifest(selectedFiles, selectedTypes);
 
         const payload = {
-          application_id: token || null,
+
           token: token || null,
           messenger_id: messengerId || null,
           full_name,
