@@ -435,57 +435,68 @@
         { code: "OTHER", label: "Other" },
       ];
 
-      // Fetch ranks from Supabase and populate dropdown
-      async function loadRanksFromSupabase() {
+      const FALLBACK_RANKS = [
+        { code: "C/O", name: "Chief Officer" },
+        { code: "2/O", name: "Second Officer" },
+        { code: "3/O", name: "Third Officer" },
+        { code: "AB", name: "Able Seaman" },
+        { code: "OS", name: "Ordinary Seaman" },
+      ];
+
+      function setRankOptions(rankRows) {
         const rankSelect = document.getElementById("rank");
+        if (!rankSelect) return;
+
+        rankSelect.innerHTML = '<option value="">-- Select a rank --</option>';
+        rankRows.forEach((rank) => {
+          const code = String(rank.code || "").trim();
+          const name = String(rank.name || "").trim();
+          if (!code) return;
+
+          const option = document.createElement("option");
+          option.value = code;
+          option.textContent = name ? `${code} - ${name}` : code;
+          rankSelect.appendChild(option);
+        });
+      }
+
+      // Optional remote source: provide ?ranks_url=https://... returning [{code,name}, ...]
+      async function loadRanks() {
         const rankHint = document.getElementById("rankHint");
-        
+        const ranksUrl = params.get("ranks_url");
+
+        // Always keep form usable with a local fallback list.
+        setRankOptions(FALLBACK_RANKS);
+
+        if (!ranksUrl) {
+          if (rankHint) rankHint.style.display = "none";
+          return;
+        }
+
         try {
-          // Try to fetch from public Supabase endpoint (adjust with your Supabase URL)
-          const supabaseUrl = "https://bsktdcthkklwysvhfbrx.supabase.co";
-          const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJza3RkY3Roa2tsd3lzdmhmYnJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzEyNTcyMTcsImV4cCI6MjA0NjgzMzIxN30.gNJ-Z96KqmPNdIdmhSMKKZONhc2b5e-bNKqHXfZQGOY";
-          
-          const url = new URL(`${supabaseUrl}/rest/v1/m_rank`);
-          url.searchParams.append("is_active", "eq.true");
-          url.searchParams.append("order", "name.asc");
-          
-          const response = await fetch(url.toString(), {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${anonKey}`,
-              "apikey": anonKey,
-            },
-          });
-          
+          const response = await fetch(ranksUrl, { method: "GET" });
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
-          
+
           const ranks = await response.json();
-          
-          // Clear default option
-          rankSelect.innerHTML = '<option value="">-- Select a rank --</option>';
-          
-          // Add ranks to dropdown
-          ranks.forEach((rank) => {
-            const option = document.createElement("option");
-            option.value = rank.code; // Use code as value (e.g., "3/O")
-            option.textContent = `${rank.code} - ${rank.name}`; // Display code + name (e.g., "3/O - Third Officer")
-            rankSelect.appendChild(option);
-          });
-          
-          rankHint.style.display = "none";
+          if (!Array.isArray(ranks) || !ranks.length) {
+            throw new Error("Rank source returned no rows");
+          }
+
+          setRankOptions(ranks);
+          if (rankHint) rankHint.style.display = "none";
         } catch (err) {
-          console.error("Failed to load ranks:", err);
-          rankHint.style.display = "block";
-          rankHint.textContent = `Failed to load ranks. Please refresh the page. Details: ${err.message}`;
+          console.error("Failed to load ranks from ranks_url. Using fallback list.", err);
+          if (rankHint) {
+            rankHint.style.display = "block";
+            rankHint.textContent = "Using built-in rank list. Ask admin to set a valid ranks_url.";
+          }
         }
       }
 
-      // Load ranks when page loads
       window.addEventListener("DOMContentLoaded", () => {
-        loadRanksFromSupabase();
+        loadRanks();
       });
 
       function escapeHtml(value) {
