@@ -254,14 +254,16 @@
 
             <div>
               <label for="rank">Rank / Position applying for *</label>
-              <select
-                id="rank"
-                name="rank"
-                required
-              >
+              <select id="rank" name="rank" required>
                 <option value="">-- Select a rank --</option>
               </select>
-              <div class="hint" id="rankHint" style="display: none; color: var(--danger);">Failed to load ranks. Please try again.</div>
+              <div
+                class="hint"
+                id="rankHint"
+                style="display: none; color: var(--danger)"
+              >
+                Failed to load ranks. Please try again.
+              </div>
             </div>
 
             <div>
@@ -332,6 +334,186 @@
                 <option value="referral">Referral</option>
                 <option value="other">Other</option>
               </select>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <h2 style="font-size: 16px; margin: 0 0 14px; letter-spacing: 0.2px">
+            Education (optional)
+          </h2>
+          <div class="grid">
+            <div>
+              <label for="school_name">School / Institution</label>
+              <input
+                id="school_name"
+                name="school_name"
+                placeholder="e.g., Maritime Academy"
+              />
+            </div>
+            <div>
+              <label for="qualification">Qualification</label>
+              <input
+                id="qualification"
+                name="qualification"
+                placeholder="e.g., Bachelor of Marine Transportation"
+              />
+            </div>
+            <div>
+              <label for="edu_start_date">Start date</label>
+              <input id="edu_start_date" name="edu_start_date" type="date" />
+            </div>
+            <div>
+              <label for="edu_end_date">End date</label>
+              <input id="edu_end_date" name="edu_end_date" type="date" />
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <h2 style="font-size: 16px; margin: 0 0 14px; letter-spacing: 0.2px">
+            Next of Kin (optional)
+          </h2>
+          <div class="grid">
+            <div>
+              <label for="kin_full_name">Full name</label>
+              <input
+                id="kin_full_name"
+                name="kin_full_name"
+                placeholder="e.g., Maria Dela Cruz"
+              />
+            </div>
+            <div>
+              <label for="kin_relationship">Relationship</label>
+              <select id="kin_relationship" name="kin_relationship">
+                <option value="">-- Select --</option>
+                <option value="spouse">Spouse</option>
+                <option value="parent">Parent</option>
+                <option value="sibling">Sibling</option>
+                <option value="child">Child</option>
+                <option value="friend">Friend</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label for="kin_phone">Phone</label>
+              <input id="kin_phone" name="kin_phone" placeholder="+63..." />
+            </div>
+            <div>
+              <label for="kin_email">Email</label>
+              <input
+                id="kin_email"
+                name="kin_email"
+                type="email"
+                placeholder="kin@email.com"
+              />
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <h2 style="font-size: 16px; margin: 0 0 14px; letter-spacing: 0.2px">
+            Sea Service History (optional)
+          </h2>
+          <div class="grid">
+            <div>
+              <label for="vessel_name">Vessel name</label>
+              <input
+                id="vessel_name"
+                name="vessel_name"
+                placeholder="e.g., MV Pacific Dawn"
+              />
+            </div>
+            <div>
+              <label for="vessel_type">Vessel type</label>
+              <select id="vessel_type" name="vessel_type">
+                <option value="">-- Select --</option>
+                <option value="tanker">Tanker</option>
+                <option value="container">Container Ship</option>
+                <option value="bulk_carrier">Bulk Carrier</option>
+                <option value="general_cargo">General Cargo</option>
+                <option value="roro">RoRo</option>
+                <option value="refrigerated">Refrigerated</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label for="sign_on_date">Sign on date</label>
+              <input id="sign_on_date" name="sign_on_date" type="date" />
+            </div>
+            <div>
+              <label for="sign_off_date">Sign off date</label>
+              <input id="sign_off_date" name="sign_off_date" type="date" />
+            </div>
+            <div>
+              <label for="sign_on_port">Sign on port</label>
+              <input
+                id="sign_on_port"
+                name="sign_on_port"
+                placeholder="e.g., Singapore"
+              />
+            </div>
+            <div>
+              <label for="sign_off_port">Sign off port</label>
+              <input
+                id="sign_off_port"
+                name="sign_off_port"
+                placeholder="e.g., Rotterdam"
+              />
+            </div>
+            <div style="grid-column: 1 / -1">
+              <label for="sea_service_remarks">Remarks</label>
+              <textarea
+                id="sea_service_remarks"
+                name="sea_service_remarks"
+                rows="2"
+                placeholder="Any additional details about this service..."
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <h2 style="font-size: 16px; margin: 0 0 14px; letter-spacing: 0.2px">
+            Training Certificate (optional)
+          </h2>
+          <div class="grid">
+            <div>
+              <label for="training_course">Training course</label>
+              <select id="training_course" name="training_course">
+                <option value="">-- Select --</option>
+                <option value="basic_safety">Basic Safety Training</option>
+                <option value="first_aid">First Aid / Medical</option>
+                <option value="firefighting">Advanced Firefighting</option>
+                <option value="leadership">Leadership & Teamwork</option>
+                <option value="gmdss">GMDSS</option>
+                <option value="advanced_stcw">Advanced STCW</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label for="certificate_no">Certificate number</label>
+              <input
+                id="certificate_no"
+                name="certificate_no"
+                placeholder="e.g., CERT-2024-001"
+              />
+            </div>
+            <div>
+              <label for="provider_name">Provider / Issuer</label>
+              <input
+                id="provider_name"
+                name="provider_name"
+                placeholder="e.g., Maritime Training Center"
+              />
+            </div>
+            <div>
+              <label for="issue_date">Issue date</label>
+              <input id="issue_date" name="issue_date" type="date" />
+            </div>
+            <div>
+              <label for="expiry_date">Expiry date</label>
+              <input id="expiry_date" name="expiry_date" type="date" />
             </div>
           </div>
 
@@ -487,10 +669,14 @@
           setRankOptions(ranks);
           if (rankHint) rankHint.style.display = "none";
         } catch (err) {
-          console.error("Failed to load ranks from ranks_url. Using fallback list.", err);
+          console.error(
+            "Failed to load ranks from ranks_url. Using fallback list.",
+            err,
+          );
           if (rankHint) {
             rankHint.style.display = "block";
-            rankHint.textContent = "Using built-in rank list. Ask admin to set a valid ranks_url.";
+            rankHint.textContent =
+              "Using built-in rank list. Ask admin to set a valid ranks_url.";
           }
         }
       }
@@ -688,7 +874,6 @@
         const documents = buildDocumentManifest(selectedFiles, selectedTypes);
 
         const payload = {
-
           token: token || null,
           messenger_id: messengerId || null,
           full_name,
