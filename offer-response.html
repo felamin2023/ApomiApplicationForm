@@ -131,24 +131,12 @@
       }
 
       function startCloseCountdown(sec) {
-        let remaining = sec;
-        statusEl.innerHTML =
-          'This page will close automatically in <span class="countdown">' +
-          remaining +
-          "</span> seconds.";
-        const interval = setInterval(() => {
-          remaining -= 1;
-          const c = document.querySelector(".countdown");
-          if (c) c.textContent = remaining;
-          if (remaining <= 0) {
-            clearInterval(interval);
-            try {
-              window.close();
-            } catch (e) {}
-            // fallback: show simple message
-            statusEl.textContent = "You can now close this page.";
-          }
-        }, 1000);
+        // DISABLED - keeping page open for debugging
+        // let remaining = sec;
+        // statusEl.innerHTML =
+        //   'This page will close automatically in <span class="countdown">' +
+        //   remaining +
+        //   "</span> seconds.";
       }
 
       function buildWebhookUrl(response) {
@@ -167,30 +155,47 @@
       }
 
       function postToWebhook(response) {
-        if (!n8nWebhook) return;
+        if (!n8nWebhook) {
+          statusEl.innerHTML +=
+            "<br><strong style='color:red;'>ERROR: No webhook URL provided</strong>";
+          console.error("No webhook URL");
+          return;
+        }
 
         const webhookUrl = buildWebhookUrl(response);
-        
+        console.log("Webhook URL:", webhookUrl);
+        statusEl.innerHTML +=
+          "<br><strong style='color:blue;'>Calling webhook...</strong><br>URL: " +
+          webhookUrl;
+
         // Use a GET request via form submission (no CORS issues)
         const form = document.createElement("form");
         form.method = "GET";
         form.action = webhookUrl;
         form.style.display = "none";
-        
+
         document.body.appendChild(form);
+        console.log("Form created and submitting...");
+        statusEl.innerHTML +=
+          "<br><strong style='color:blue;'>Form submitted</strong>";
         form.submit();
       }
 
       async function sendResponse(response) {
-        if (clicked) return;
+        if (clicked) {
+          statusEl.innerHTML +=
+            "<br><strong style='color:red;'>ERROR: Already submitted</strong>";
+          return;
+        }
         if (alreadySubmitted()) {
           disableButtons();
-          showThankYou(alreadySubmitted());
+          statusEl.innerHTML = "Already submitted: " + alreadySubmitted();
           return;
         }
 
         disableButtons();
-        statusEl.textContent = "Sending response...";
+        statusEl.innerHTML =
+          "<strong style='color:blue;'>Processing response...</strong>";
 
         markSubmitted(response);
 
@@ -204,17 +209,24 @@
           document_name: documentName,
         };
 
+        console.log("Payload:", payload);
+        statusEl.innerHTML +=
+          "<br><strong>Payload:</strong><pre style='background:#f3f4f6;padding:8px;border-radius:4px;font-size:12px;'>" +
+          JSON.stringify(payload, null, 2) +
+          "</pre>";
+
         try {
           postToWebhook(response);
-          showThankYou(response);
-          startCloseCountdown(10);
+          statusEl.innerHTML +=
+            "<br><strong style='color:green;'>Response sent! Check n8n for execution.</strong>";
           return;
         } catch (err) {
-          console.error(err);
+          console.error("Error:", err);
+          statusEl.innerHTML +=
+            "<br><strong style='color:red;'>ERROR: " +
+            err.message +
+            "</strong>";
         }
-
-        statusEl.textContent =
-          "Unable to send response automatically. Please contact support.";
       }
 
       // Wire buttons
@@ -231,9 +243,20 @@
       const prev = alreadySubmitted();
       if (prev) {
         disableButtons();
-        showThankYou(prev);
-        startCloseCountdown(10);
+        statusEl.innerHTML =
+          "<strong style='color:orange;'>Already submitted:</strong> " + prev;
       }
+
+      // DEBUG: Show what was parsed
+      console.log("=== PAGE INITIALIZED ===");
+      console.log("Application ID:", applicationId);
+      console.log("Candidate Name:", candidateName);
+      console.log("Candidate Email:", candidateEmail);
+      console.log("Candidate PSID:", candidatePsid);
+      console.log("Offer Document ID:", offerDocumentId);
+      console.log("Document Name:", documentName);
+      console.log("N8N Webhook URL:", n8nWebhook);
+      console.log("Initial Response:", initialResponse);
     </script>
   </body>
 </html>
