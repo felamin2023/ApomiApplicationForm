@@ -95,6 +95,40 @@
         }, 1000);
       }
 
+      function postToWebhook(response) {
+        if (!n8nWebhook) return;
+
+        const iframe = document.createElement('iframe');
+        iframe.name = 'offer_response_target';
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = n8nWebhook;
+        form.target = 'offer_response_target';
+        form.style.display = 'none';
+
+        const appendField = (name, value) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = name;
+          input.value = value == null ? '' : String(value);
+          form.appendChild(input);
+        };
+
+        appendField('application_id', applicationId);
+        appendField('candidate_name', candidateName);
+        appendField('candidate_email', candidateEmail);
+        appendField('candidate_psid', candidatePsid);
+        appendField('response', response);
+        appendField('offer_document_id', offerDocumentId);
+        appendField('document_name', documentName);
+
+        document.body.appendChild(form);
+        form.submit();
+      }
+
       async function sendResponse(response) {
         if (clicked) return;
         if (alreadySubmitted()) {
@@ -118,41 +152,8 @@
           document_name: documentName,
         };
 
-        // Try sending via fetch to the n8n webhook (CORS may block).
-        if (n8nWebhook) {
-          try {
-            const res = await fetch(n8nWebhook, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-              mode: 'cors',
-            });
-
-            if (res.ok) {
-              const data = await res.json().catch(() => null);
-              showThankYou((data && data.response) ? data.response : response);
-              startCloseCountdown(10);
-              return;
-            }
-
-            // non-OK HTTP
-            showThankYou(response);
-            startCloseCountdown(10);
-            return;
-          } catch (err) {
-            // CORS or network error - fall through to iframe fallback
-            console.warn('Fetch to n8n webhook failed, attempting iframe fallback', err);
-          }
-        }
-
-        // Fallback: use a hidden iframe to perform a GET request to the webhook with query params.
         try {
-          const iframe = document.createElement('iframe');
-          iframe.style.display = 'none';
-          const query = new URLSearchParams(payload).toString();
-          iframe.src = (n8nWebhook ? n8nWebhook : window.location.origin) + (n8nWebhook && n8nWebhook.includes('?') ? '&' : '?') + query;
-          document.body.appendChild(iframe);
-
+          postToWebhook(response);
           showThankYou(response);
           startCloseCountdown(10);
           return;
