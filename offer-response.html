@@ -5,82 +5,147 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Offer Response — Thank you</title>
     <style>
-      body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;background:#f3f4f6;color:#0b1220;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
-      .card{max-width:720px;width:100%;background:#fff;border-radius:12px;padding:28px;box-shadow:0 8px 40px rgba(2,6,23,0.08)}
-      h1{margin:0 0 8px;font-size:20px}
-      p{margin:0 0 12px;color:#374151}
-      .muted{color:#6b7280;font-size:13px}
-      .status{margin-top:12px;padding:12px;border-radius:8px;background:#f8fafc;color:#0b1220}
+      body {
+        font-family:
+          system-ui,
+          Segoe UI,
+          Roboto,
+          Arial;
+        margin: 0;
+        background: #f3f4f6;
+        color: #0b1220;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 24px;
+      }
+      .card {
+        max-width: 720px;
+        width: 100%;
+        background: #fff;
+        border-radius: 12px;
+        padding: 28px;
+        box-shadow: 0 8px 40px rgba(2, 6, 23, 0.08);
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 20px;
+      }
+      p {
+        margin: 0 0 12px;
+        color: #374151;
+      }
+      .muted {
+        color: #6b7280;
+        font-size: 13px;
+      }
+      .status {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 8px;
+        background: #f8fafc;
+        color: #0b1220;
+      }
     </style>
   </head>
   <body>
     <div class="card">
       <h1 id="title">Thank you</h1>
       <p id="message">We are processing your response — one moment please.</p>
-      <p class="muted">If you see this page a second time, you may safely close the tab.</p>
-      <div id="status" class="status" style="display:none"></div>
+      <p class="muted">
+        If you see this page a second time, you may safely close the tab.
+      </p>
+      <div id="status" class="status" style="display: none"></div>
     </div>
 
     <script>
       (function () {
         const qs = new URLSearchParams(location.search);
-        const application_id = qs.get('application_id');
-        const response = qs.get('response');
-        const candidate_name = qs.get('candidate_name');
-        const candidate_email = qs.get('candidate_email');
-        const candidate_psid = qs.get('candidate_psid');
-        const offer_document_id = qs.get('offer_document_id');
-        const document_name = qs.get('document_name');
-        const webhook_url = qs.get('webhook_url');
+        const application_id = qs.get("application_id");
+        const response = qs.get("response");
+        const candidate_name = qs.get("candidate_name");
+        const candidate_email = qs.get("candidate_email");
+        const candidate_psid = qs.get("candidate_psid");
+        const offer_document_id = qs.get("offer_document_id");
+        const document_name = qs.get("document_name");
+        const webhook_url = qs.get("webhook_url");
 
-        const titleEl = document.getElementById('title');
-        const msgEl = document.getElementById('message');
-        const statusEl = document.getElementById('status');
+        const titleEl = document.getElementById("title");
+        const msgEl = document.getElementById("message");
+        const statusEl = document.getElementById("status");
 
         // Friendly message
-        const shortName = candidate_name ? decodeURIComponent(candidate_name) : 'Applicant';
-        titleEl.textContent = response === 'ACCEPTED' ? 'Thanks, ' + shortName : 'Thanks for your response';
-        msgEl.textContent = response === 'ACCEPTED' ? 'Thank you for accepting the offer. We are updating your application now.' : 'Thanks for letting us know. We have recorded your response.';
+        const shortName = candidate_name
+          ? decodeURIComponent(candidate_name)
+          : "Applicant";
+        titleEl.textContent =
+          response === "ACCEPTED"
+            ? "Thanks, " + shortName
+            : "Thanks for your response";
+        msgEl.textContent =
+          response === "ACCEPTED"
+            ? "Thank you for accepting the offer. We are updating your application now."
+            : "Thanks for letting us know. We have recorded your response.";
 
         // If webhook_url present, POST data in background to trigger the update workflow
         if (!webhook_url) {
-          statusEl.style.display = '';
-          statusEl.textContent = 'No webhook target provided — the application may not be updated automatically.';
+          statusEl.style.display = "";
+          statusEl.textContent =
+            "No webhook target provided — the application may not be updated automatically.";
           return;
         }
 
         const target = decodeURIComponent(webhook_url);
         const payload = {
           application_id: application_id || null,
-          candidate_name: candidate_name ? decodeURIComponent(candidate_name) : null,
-          candidate_email: candidate_email ? decodeURIComponent(candidate_email) : null,
-          candidate_psid: candidate_psid ? decodeURIComponent(candidate_psid) : null,
+          candidate_name: candidate_name
+            ? decodeURIComponent(candidate_name)
+            : null,
+          candidate_email: candidate_email
+            ? decodeURIComponent(candidate_email)
+            : null,
+          candidate_psid: candidate_psid
+            ? decodeURIComponent(candidate_psid)
+            : null,
           response: response || null,
           offer_document_id: offer_document_id || null,
-          document_name: document_name ? decodeURIComponent(document_name) : null,
+          document_name: document_name
+            ? decodeURIComponent(document_name)
+            : null,
         };
+
+        const queryString = Object.entries(payload)
+          .filter(([, value]) => value !== null && value !== undefined && value !== '')
+          .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+          .join('&');
+
+        const requestUrl = queryString ? `${target}?${queryString}` : target;
 
         // Try POSTing once; show status. Candidate's browser will run this request.
         (async () => {
           try {
-            statusEl.style.display = '';
-            statusEl.textContent = 'Sending response — please wait...';
+            statusEl.style.display = "";
+            statusEl.textContent = "Sending response — please wait...";
 
-            const res = await fetch(target, {
-              method: 'POST',
-              mode: 'cors',
-              headers: { 'Content-Type': 'application/json' },
+            const res = await fetch(requestUrl, {
+              method: "POST",
+              mode: "cors",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),
             });
 
             if (!res.ok) {
-              const text = await res.text().catch(() => '');
-              statusEl.textContent = 'Server response error: ' + res.status + ' ' + text;
+              const text = await res.text().catch(() => "");
+              statusEl.textContent =
+                "Server response error: " + res.status + " " + text;
             } else {
-              statusEl.textContent = 'Response recorded. You may now close this tab.';
+              statusEl.textContent =
+                "Response recorded. You may now close this tab.";
             }
           } catch (err) {
-            statusEl.textContent = 'Network error: could not reach the update endpoint.';
+            statusEl.textContent =
+              "Network error: could not reach the update endpoint.";
           }
         })();
       })();
