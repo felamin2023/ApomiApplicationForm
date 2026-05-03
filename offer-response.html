@@ -2,261 +2,88 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Offer Response</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Offer Response — Thank you</title>
     <style>
-      body {
-        font-family: Arial, Helvetica, sans-serif;
-        background: #f3f4f6;
-        color: #111827;
-        margin: 0;
-        padding: 28px;
-      }
-      .card {
-        max-width: 640px;
-        margin: 40px auto;
-        background: #fff;
-        border-radius: 12px;
-        padding: 24px;
-        box-shadow: 0 10px 30px rgba(17, 24, 39, 0.06);
-      }
-      h1 {
-        margin: 0 0 8px;
-        font-size: 20px;
-      }
-      p {
-        margin: 0 0 12px;
-      }
-      .actions {
-        display: flex;
-        gap: 12px;
-        margin-top: 18px;
-      }
-      .btn {
-        padding: 12px 18px;
-        border-radius: 10px;
-        border: 0;
-        color: #fff;
-        font-weight: 700;
-        cursor: pointer;
-      }
-      .btn-accept {
-        background: #16a34a;
-      }
-      .btn-decline {
-        background: #dc2626;
-      }
-      .status {
-        margin-top: 14px;
-        color: #6b7280;
-      }
-      .hidden {
-        display: none;
-      }
-      .countdown {
-        font-weight: 700;
-      }
+      body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;background:#f3f4f6;color:#0b1220;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+      .card{max-width:720px;width:100%;background:#fff;border-radius:12px;padding:28px;box-shadow:0 8px 40px rgba(2,6,23,0.08)}
+      h1{margin:0 0 8px;font-size:20px}
+      p{margin:0 0 12px;color:#374151}
+      .muted{color:#6b7280;font-size:13px}
+      .status{margin-top:12px;padding:12px;border-radius:8px;background:#f8fafc;color:#0b1220}
     </style>
   </head>
   <body>
     <div class="card">
-      <h1 id="title">Offer Response</h1>
-      <p id="message">Choose an action below to respond to the offer.</p>
-
-      <div class="actions" id="buttonRow">
-        <button id="acceptBtn" class="btn btn-accept">Accept offer</button>
-        <button id="declineBtn" class="btn btn-decline">Decline offer</button>
-      </div>
-
-      <div class="status" id="status"></div>
+      <h1 id="title">Thank you</h1>
+      <p id="message">We are processing your response — one moment please.</p>
+      <p class="muted">If you see this page a second time, you may safely close the tab.</p>
+      <div id="status" class="status" style="display:none"></div>
     </div>
 
     <script>
-      // Parse params
-      const params = new URLSearchParams(location.search);
-      const applicationId = params.get("application_id") || "";
-      const candidateName = params.get("candidate_name") || "";
-      const candidateEmail = params.get("candidate_email") || "";
-      const candidatePsid = params.get("candidate_psid") || "";
-      const offerDocumentId = params.get("offer_document_id") || "";
-      const documentName = params.get("document_name") || "";
-      const n8nWebhook =
-        params.get("n8n_webhook") ||
-        "https://magnitude-holidays-wedding-diana.trycloudflare.com/webhook/webhook-offer-accepted"; // full n8n webhook URL
-      const initialResponse = (params.get("response") || "").toUpperCase();
+      (function () {
+        const qs = new URLSearchParams(location.search);
+        const application_id = qs.get('application_id');
+        const response = qs.get('response');
+        const candidate_name = qs.get('candidate_name');
+        const candidate_email = qs.get('candidate_email');
+        const candidate_psid = qs.get('candidate_psid');
+        const offer_document_id = qs.get('offer_document_id');
+        const document_name = qs.get('document_name');
+        const webhook_url = qs.get('webhook_url');
 
-      const titleEl = document.getElementById("title");
-      const msgEl = document.getElementById("message");
-      const statusEl = document.getElementById("status");
-      const acceptBtn = document.getElementById("acceptBtn");
-      const declineBtn = document.getElementById("declineBtn");
-      const buttonRow = document.getElementById("buttonRow");
+        const titleEl = document.getElementById('title');
+        const msgEl = document.getElementById('message');
+        const statusEl = document.getElementById('status');
 
-      const storageKey = applicationId
-        ? "offer_response_" + applicationId
-        : null;
+        // Friendly message
+        const shortName = candidate_name ? decodeURIComponent(candidate_name) : 'Applicant';
+        titleEl.textContent = response === 'ACCEPTED' ? 'Thanks, ' + shortName : 'Thanks for your response';
+        msgEl.textContent = response === 'ACCEPTED' ? 'Thank you for accepting the offer. We are updating your application now.' : 'Thanks for letting us know. We have recorded your response.';
 
-      let clicked = false;
-
-      function disableButtons() {
-        clicked = true;
-        acceptBtn.disabled = true;
-        declineBtn.disabled = true;
-        acceptBtn.style.opacity = "0.6";
-        declineBtn.style.opacity = "0.6";
-        if (buttonRow) buttonRow.style.display = "none";
-      }
-
-      function showThankYou(response) {
-        titleEl.textContent = "Thank you";
-        msgEl.textContent = "We received your response: " + response + ".";
-        statusEl.textContent =
-          "This page will close automatically in 10 seconds.";
-      }
-
-      function markSubmitted(response) {
-        if (!storageKey) return;
-        try {
-          localStorage.setItem(storageKey, response);
-        } catch (e) {}
-      }
-
-      function alreadySubmitted() {
-        if (!storageKey) return null;
-        try {
-          return localStorage.getItem(storageKey);
-        } catch (e) {
-          return null;
-        }
-      }
-
-      function startCloseCountdown(sec) {
-        // DISABLED - keeping page open for debugging
-        // let remaining = sec;
-        // statusEl.innerHTML =
-        //   'This page will close automatically in <span class="countdown">' +
-        //   remaining +
-        //   "</span> seconds.";
-      }
-
-      function buildWebhookUrl(response) {
-        if (!n8nWebhook) return "";
-
-        const params = new URLSearchParams();
-        params.append("application_id", applicationId);
-        params.append("candidate_name", candidateName);
-        params.append("candidate_email", candidateEmail);
-        params.append("candidate_psid", candidatePsid);
-        params.append("response", response);
-        params.append("offer_document_id", offerDocumentId);
-        params.append("document_name", documentName);
-
-        return n8nWebhook + "?" + params.toString();
-      }
-
-      function postToWebhook(response) {
-        if (!n8nWebhook) {
-          statusEl.innerHTML +=
-            "<br><strong style='color:red;'>ERROR: No webhook URL provided</strong>";
-          console.error("No webhook URL");
+        // If webhook_url present, POST data in background to trigger the update workflow
+        if (!webhook_url) {
+          statusEl.style.display = '';
+          statusEl.textContent = 'No webhook target provided — the application may not be updated automatically.';
           return;
         }
 
-        const webhookUrl = buildWebhookUrl(response);
-        console.log("Webhook URL:", webhookUrl);
-        statusEl.innerHTML +=
-          "<br><strong style='color:blue;'>Calling webhook...</strong><br>URL: " +
-          webhookUrl;
-
-        // Use a GET request via form submission (no CORS issues)
-        const form = document.createElement("form");
-        form.method = "GET";
-        form.action = webhookUrl;
-        form.style.display = "none";
-
-        document.body.appendChild(form);
-        console.log("Form created and submitting...");
-        statusEl.innerHTML +=
-          "<br><strong style='color:blue;'>Form submitted</strong>";
-        form.submit();
-      }
-
-      async function sendResponse(response) {
-        if (clicked) {
-          statusEl.innerHTML +=
-            "<br><strong style='color:red;'>ERROR: Already submitted</strong>";
-          return;
-        }
-        if (alreadySubmitted()) {
-          disableButtons();
-          statusEl.innerHTML = "Already submitted: " + alreadySubmitted();
-          return;
-        }
-
-        disableButtons();
-        statusEl.innerHTML =
-          "<strong style='color:blue;'>Processing response...</strong>";
-
-        markSubmitted(response);
-
+        const target = decodeURIComponent(webhook_url);
         const payload = {
-          application_id: applicationId,
-          candidate_name: candidateName,
-          candidate_email: candidateEmail,
-          candidate_psid: candidatePsid,
-          response: response,
-          offer_document_id: offerDocumentId,
-          document_name: documentName,
+          application_id: application_id || null,
+          candidate_name: candidate_name ? decodeURIComponent(candidate_name) : null,
+          candidate_email: candidate_email ? decodeURIComponent(candidate_email) : null,
+          candidate_psid: candidate_psid ? decodeURIComponent(candidate_psid) : null,
+          response: response || null,
+          offer_document_id: offer_document_id || null,
+          document_name: document_name ? decodeURIComponent(document_name) : null,
         };
 
-        console.log("Payload:", payload);
-        statusEl.innerHTML +=
-          "<br><strong>Payload:</strong><pre style='background:#f3f4f6;padding:8px;border-radius:4px;font-size:12px;'>" +
-          JSON.stringify(payload, null, 2) +
-          "</pre>";
+        // Try POSTing once; show status. Candidate's browser will run this request.
+        (async () => {
+          try {
+            statusEl.style.display = '';
+            statusEl.textContent = 'Sending response — please wait...';
 
-        try {
-          postToWebhook(response);
-          statusEl.innerHTML +=
-            "<br><strong style='color:green;'>Response sent! Check n8n for execution.</strong>";
-          return;
-        } catch (err) {
-          console.error("Error:", err);
-          statusEl.innerHTML +=
-            "<br><strong style='color:red;'>ERROR: " +
-            err.message +
-            "</strong>";
-        }
-      }
+            const res = await fetch(target, {
+              method: 'POST',
+              mode: 'cors',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
 
-      // Wire buttons
-      acceptBtn.addEventListener("click", () => sendResponse("ACCEPTED"));
-      declineBtn.addEventListener("click", () => sendResponse("DECLINED"));
-
-      // If `response` param present (email button went directly here), auto-submit and disable buttons.
-      if (initialResponse === "ACCEPTED" || initialResponse === "DECLINED") {
-        msgEl.textContent = "Processing your response...";
-        sendResponse(initialResponse);
-      }
-
-      // If already submitted, show message and disable
-      const prev = alreadySubmitted();
-      if (prev) {
-        disableButtons();
-        statusEl.innerHTML =
-          "<strong style='color:orange;'>Already submitted:</strong> " + prev;
-      }
-
-      // DEBUG: Show what was parsed
-      console.log("=== PAGE INITIALIZED ===");
-      console.log("Application ID:", applicationId);
-      console.log("Candidate Name:", candidateName);
-      console.log("Candidate Email:", candidateEmail);
-      console.log("Candidate PSID:", candidatePsid);
-      console.log("Offer Document ID:", offerDocumentId);
-      console.log("Document Name:", documentName);
-      console.log("N8N Webhook URL:", n8nWebhook);
-      console.log("Initial Response:", initialResponse);
+            if (!res.ok) {
+              const text = await res.text().catch(() => '');
+              statusEl.textContent = 'Server response error: ' + res.status + ' ' + text;
+            } else {
+              statusEl.textContent = 'Response recorded. You may now close this tab.';
+            }
+          } catch (err) {
+            statusEl.textContent = 'Network error: could not reach the update endpoint.';
+          }
+        })();
+      })();
     </script>
   </body>
 </html>
