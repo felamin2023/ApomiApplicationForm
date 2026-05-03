@@ -116,38 +116,37 @@
         };
 
         const queryString = Object.entries(payload)
-          .filter(([, value]) => value !== null && value !== undefined && value !== '')
-          .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
-          .join('&');
+          .filter(
+            ([, value]) =>
+              value !== null && value !== undefined && value !== "",
+          )
+          .map(
+            ([key, value]) =>
+              `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`,
+          )
+          .join("&");
 
         const requestUrl = queryString ? `${target}?${queryString}` : target;
 
-        // Try POSTing once; show status. Candidate's browser will run this request.
-        (async () => {
-          try {
-            statusEl.style.display = "";
-            statusEl.textContent = "Sending response — please wait...";
+        // Use GET so the webhook hits the same working branch as your old direct link.
+        // An Image request avoids navigation and does not need CORS handling.
+        statusEl.style.display = "";
+        statusEl.textContent = "Sending response — please wait...";
 
-            const res = await fetch(requestUrl, {
-              method: "POST",
-              mode: "cors",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            });
-
-            if (!res.ok) {
-              const text = await res.text().catch(() => "");
-              statusEl.textContent =
-                "Server response error: " + res.status + " " + text;
-            } else {
-              statusEl.textContent =
-                "Response recorded. You may now close this tab.";
-            }
-          } catch (err) {
-            statusEl.textContent =
-              "Network error: could not reach the update endpoint.";
-          }
-        })();
+        const ping = new Image();
+        ping.onload = () => {
+          statusEl.textContent =
+            "Response recorded. You may now close this tab.";
+        };
+        ping.onerror = () => {
+          statusEl.textContent =
+            "Request sent, but the browser could not confirm completion. You may now close this tab.";
+        };
+        ping.src =
+          requestUrl +
+          (requestUrl.includes("?") ? "&" : "?") +
+          "_ts=" +
+          Date.now();
       })();
     </script>
   </body>
