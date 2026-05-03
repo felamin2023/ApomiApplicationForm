@@ -166,15 +166,19 @@
         return n8nWebhook + "?" + params.toString();
       }
 
-      async function postToWebhook(response) {
+      function postToWebhook(response) {
         if (!n8nWebhook) return;
 
         const webhookUrl = buildWebhookUrl(response);
-        try {
-          await fetch(webhookUrl, { method: "GET" });
-        } catch (err) {
-          console.error("Webhook call error:", err);
-        }
+        
+        // Use a GET request via form submission (no CORS issues)
+        const form = document.createElement("form");
+        form.method = "GET";
+        form.action = webhookUrl;
+        form.style.display = "none";
+        
+        document.body.appendChild(form);
+        form.submit();
       }
 
       async function sendResponse(response) {
