@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Offer Response</title>
+    <style>
+      body{font-family:Arial,Helvetica,sans-serif;background:#f3f4f6;color:#111827;margin:0;padding:28px}
+      .card{max-width:640px;margin:40px auto;background:#fff;border-radius:12px;padding:24px;box-shadow:0 10px 30px rgba(17,24,39,.06)}
+      h1{margin:0 0 8px;font-size:20px}
+      p{margin:0 0 12px}
+      .actions{display:flex;gap:12px;margin-top:18px}
+      .btn{padding:12px 18px;border-radius:10px;border:0;color:#fff;font-weight:700;cursor:pointer}
+      .btn-accept{background:#16a34a}
+      .btn-decline{background:#dc2626}
+      .status{margin-top:14px;color:#6b7280}
+      .hidden{display:none}
+      .countdown{font-weight:700}
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1 id="title">Offer Response</h1>
+      <p id="message">Choose an action below to respond to the offer.</p>
+
+      <div class="actions" id="buttonRow">
+        <button id="acceptBtn" class="btn btn-accept">Accept offer</button>
+        <button id="declineBtn" class="btn btn-decline">Decline offer</button>
+      </div>
+
+      <div class="status" id="status"></div>
+    </div>
+
+    <script>
+      // Parse params
+      const params = new URLSearchParams(location.search);
+      const applicationId = params.get('application_id') || '';
+      const candidateName = params.get('candidate_name') || '';
+      const candidateEmail = params.get('candidate_email') || '';
+      const candidatePsid = params.get('candidate_psid') || '';
+      const offerDocumentId = params.get('offer_document_id') || '';
+      const documentName = params.get('document_name') || '';
+      const n8nWebhook = params.get('n8n_webhook') || ''; // full n8n webhook URL
+      const initialResponse = (params.get('response') || '').toUpperCase();
+
+      const titleEl = document.getElementById('title');
+      const msgEl = document.getElementById('message');
+      const statusEl = document.getElementById('status');
+      const acceptBtn = document.getElementById('acceptBtn');
+      const declineBtn = document.getElementById('declineBtn');
+      const buttonRow = document.getElementById('buttonRow');
+
+      const storageKey = applicationId ? 'offer_response_' + applicationId : null;
+
+      let clicked = false;
+
+      function disableButtons() {
+        clicked = true;
+        acceptBtn.disabled = true;
+        declineBtn.disabled = true;
+        acceptBtn.style.opacity = '0.6';
+        declineBtn.style.opacity = '0.6';
+      }
+
+      function markSubmitted(response) {
+        if (!storageKey) return;
+        try { localStorage.setItem(storageKey, response); } catch(e) {}
+      }
+
+      function alreadySubmitted() {
+        if (!storageKey) return null;
+        try { return localStorage.getItem(storageKey); } catch(e) { return null; }
+      }
+
+      function startCloseCountdown(sec) {
+        let remaining = sec;
+        statusEl.innerHTML = 'This page will close automatically in <span class="countdown">' + remaining + '</span> seconds.';
+        const interval = setInterval(() => {
+          remaining -= 1;
+          const c = document.querySelector('.countdown');
+          if (c) c.textContent = remaining;
+          if (remaining <= 0) {
+            clearInterval(interval);
+            try { window.close(); } catch(e) {}
+            // fallback: show simple message
+            statusEl.textContent = 'You can now close this page.';
+          }
+        }, 1000);
+      }
+
+      async function sendResponse(response) {
+        if (clicked) return;
+        if (alreadySubmitted()) {
+          statusEl.textContent = 'You have already responded: ' + alreadySubmitted();
+          disableButtons();
+          return;
+        }
+
+        disableButtons();
+        statusEl.textContent = 'Sending response...';
+
+        markSubmitted(response);
+
+        const payload = {
+          application_id: applicationId,
+          candidate_name: candidateName,
+          candidate_email: candidateEmail,
+          candidate_psid: candidatePsid,
+          response: response,
+          offer_document_id: offerDocumentId,
+          document_name: documentName,
+        };
+
+        // Try sending via fetch to the n8n webhook (CORS may block).
+        if (n8nWebhook) {
+          try {
+            const res = await fetch(n8nWebhook, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+              mode: 'cors',
+            });
+
+            if (res.ok) {
+              const data = await res.json().catch(() => null);
+              statusEl.innerHTML = (data && data.message) ? data.message : ('Response recorded: ' + response);
+              startCloseCountdown(10);
+              return;
+            }
+
+            // non-OK HTTP
+            statusEl.textContent = 'Response sent, server returned status ' + res.status + '. Closing in 10s.';
+            startCloseCountdown(10);
+            return;
+          } catch (err) {
+            // CORS or network error - fall through to iframe fallback
+            console.warn('Fetch to n8n webhook failed, attempting iframe fallback', err);
+          }
+        }
+
+        // Fallback: use a hidden iframe to perform a GET request to the webhook with query params.
+        try {
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          const query = new URLSearchParams(payload).toString();
+          iframe.src = (n8nWebhook ? n8nWebhook : window.location.origin) + (n8nWebhook && n8nWebhook.includes('?') ? '&' : '?') + query;
+          document.body.appendChild(iframe);
+
+          statusEl.textContent = 'Response submitted. This page will close in 10 seconds.';
+          startCloseCountdown(10);
+          return;
+        } catch (err) {
+          console.error(err);
+        }
+
+        statusEl.textContent = 'Unable to send response automatically. Please contact support.';
+      }
+
+      // Wire buttons
+      acceptBtn.addEventListener('click', () => sendResponse('ACCEPTED'));
+      declineBtn.addEventListener('click', () => sendResponse('DECLINED'));
+
+      // If `response` param present (email button went directly here), auto-submit and disable buttons.
+      if (initialResponse === 'ACCEPTED' || initialResponse === 'DECLINED') {
+        msgEl.textContent = 'Processing your response...';
+        sendResponse(initialResponse);
+      }
+
+      // If already submitted, show message and disable
+      const prev = alreadySubmitted();
+      if (prev) {
+        msgEl.textContent = 'You already responded: ' + prev;
+        disableButtons();
+        statusEl.textContent = 'This page will close automatically in 10 seconds.';
+        startCloseCountdown(10);
+      }
+    </script>
+  </body>
+</html>
