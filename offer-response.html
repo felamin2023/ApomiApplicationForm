@@ -5,17 +5,57 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Offer Response</title>
     <style>
-      body{font-family:Arial,Helvetica,sans-serif;background:#f3f4f6;color:#111827;margin:0;padding:28px}
-      .card{max-width:640px;margin:40px auto;background:#fff;border-radius:12px;padding:24px;box-shadow:0 10px 30px rgba(17,24,39,.06)}
-      h1{margin:0 0 8px;font-size:20px}
-      p{margin:0 0 12px}
-      .actions{display:flex;gap:12px;margin-top:18px}
-      .btn{padding:12px 18px;border-radius:10px;border:0;color:#fff;font-weight:700;cursor:pointer}
-      .btn-accept{background:#16a34a}
-      .btn-decline{background:#dc2626}
-      .status{margin-top:14px;color:#6b7280}
-      .hidden{display:none}
-      .countdown{font-weight:700}
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        background: #f3f4f6;
+        color: #111827;
+        margin: 0;
+        padding: 28px;
+      }
+      .card {
+        max-width: 640px;
+        margin: 40px auto;
+        background: #fff;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 10px 30px rgba(17, 24, 39, 0.06);
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 20px;
+      }
+      p {
+        margin: 0 0 12px;
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 18px;
+      }
+      .btn {
+        padding: 12px 18px;
+        border-radius: 10px;
+        border: 0;
+        color: #fff;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .btn-accept {
+        background: #16a34a;
+      }
+      .btn-decline {
+        background: #dc2626;
+      }
+      .status {
+        margin-top: 14px;
+        color: #6b7280;
+      }
+      .hidden {
+        display: none;
+      }
+      .countdown {
+        font-weight: 700;
+      }
     </style>
   </head>
   <body>
@@ -34,23 +74,27 @@
     <script>
       // Parse params
       const params = new URLSearchParams(location.search);
-      const applicationId = params.get('application_id') || '';
-      const candidateName = params.get('candidate_name') || '';
-      const candidateEmail = params.get('candidate_email') || '';
-      const candidatePsid = params.get('candidate_psid') || '';
-      const offerDocumentId = params.get('offer_document_id') || '';
-      const documentName = params.get('document_name') || '';
-      const n8nWebhook = params.get('n8n_webhook') || 'https://magnitude-holidays-wedding-diana.trycloudflare.com/webhook/webhook-offer-accepted'; // full n8n webhook URL
-      const initialResponse = (params.get('response') || '').toUpperCase();
+      const applicationId = params.get("application_id") || "";
+      const candidateName = params.get("candidate_name") || "";
+      const candidateEmail = params.get("candidate_email") || "";
+      const candidatePsid = params.get("candidate_psid") || "";
+      const offerDocumentId = params.get("offer_document_id") || "";
+      const documentName = params.get("document_name") || "";
+      const n8nWebhook =
+        params.get("n8n_webhook") ||
+        "https://magnitude-holidays-wedding-diana.trycloudflare.com/webhook/webhook-offer-accepted"; // full n8n webhook URL
+      const initialResponse = (params.get("response") || "").toUpperCase();
 
-      const titleEl = document.getElementById('title');
-      const msgEl = document.getElementById('message');
-      const statusEl = document.getElementById('status');
-      const acceptBtn = document.getElementById('acceptBtn');
-      const declineBtn = document.getElementById('declineBtn');
-      const buttonRow = document.getElementById('buttonRow');
+      const titleEl = document.getElementById("title");
+      const msgEl = document.getElementById("message");
+      const statusEl = document.getElementById("status");
+      const acceptBtn = document.getElementById("acceptBtn");
+      const declineBtn = document.getElementById("declineBtn");
+      const buttonRow = document.getElementById("buttonRow");
 
-      const storageKey = applicationId ? 'offer_response_' + applicationId : null;
+      const storageKey = applicationId
+        ? "offer_response_" + applicationId
+        : null;
 
       let clicked = false;
 
@@ -58,75 +102,79 @@
         clicked = true;
         acceptBtn.disabled = true;
         declineBtn.disabled = true;
-        acceptBtn.style.opacity = '0.6';
-        declineBtn.style.opacity = '0.6';
-        if (buttonRow) buttonRow.style.display = 'none';
+        acceptBtn.style.opacity = "0.6";
+        declineBtn.style.opacity = "0.6";
+        if (buttonRow) buttonRow.style.display = "none";
       }
 
       function showThankYou(response) {
-        titleEl.textContent = 'Thank you';
-        msgEl.textContent = 'We received your response: ' + response + '.';
-        statusEl.textContent = 'This page will close automatically in 10 seconds.';
+        titleEl.textContent = "Thank you";
+        msgEl.textContent = "We received your response: " + response + ".";
+        statusEl.textContent =
+          "This page will close automatically in 10 seconds.";
       }
 
       function markSubmitted(response) {
         if (!storageKey) return;
-        try { localStorage.setItem(storageKey, response); } catch(e) {}
+        try {
+          localStorage.setItem(storageKey, response);
+        } catch (e) {}
       }
 
       function alreadySubmitted() {
         if (!storageKey) return null;
-        try { return localStorage.getItem(storageKey); } catch(e) { return null; }
+        try {
+          return localStorage.getItem(storageKey);
+        } catch (e) {
+          return null;
+        }
       }
 
       function startCloseCountdown(sec) {
         let remaining = sec;
-        statusEl.innerHTML = 'This page will close automatically in <span class="countdown">' + remaining + '</span> seconds.';
+        statusEl.innerHTML =
+          'This page will close automatically in <span class="countdown">' +
+          remaining +
+          "</span> seconds.";
         const interval = setInterval(() => {
           remaining -= 1;
-          const c = document.querySelector('.countdown');
+          const c = document.querySelector(".countdown");
           if (c) c.textContent = remaining;
           if (remaining <= 0) {
             clearInterval(interval);
-            try { window.close(); } catch(e) {}
+            try {
+              window.close();
+            } catch (e) {}
             // fallback: show simple message
-            statusEl.textContent = 'You can now close this page.';
+            statusEl.textContent = "You can now close this page.";
           }
         }, 1000);
       }
 
-      function postToWebhook(response) {
+      function buildWebhookUrl(response) {
+        if (!n8nWebhook) return "";
+
+        const params = new URLSearchParams();
+        params.append("application_id", applicationId);
+        params.append("candidate_name", candidateName);
+        params.append("candidate_email", candidateEmail);
+        params.append("candidate_psid", candidatePsid);
+        params.append("response", response);
+        params.append("offer_document_id", offerDocumentId);
+        params.append("document_name", documentName);
+
+        return n8nWebhook + "?" + params.toString();
+      }
+
+      async function postToWebhook(response) {
         if (!n8nWebhook) return;
 
-        const iframe = document.createElement('iframe');
-        iframe.name = 'offer_response_target';
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = n8nWebhook;
-        form.target = 'offer_response_target';
-        form.style.display = 'none';
-
-        const appendField = (name, value) => {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = name;
-          input.value = value == null ? '' : String(value);
-          form.appendChild(input);
-        };
-
-        appendField('application_id', applicationId);
-        appendField('candidate_name', candidateName);
-        appendField('candidate_email', candidateEmail);
-        appendField('candidate_psid', candidatePsid);
-        appendField('response', response);
-        appendField('offer_document_id', offerDocumentId);
-        appendField('document_name', documentName);
-
-        document.body.appendChild(form);
-        form.submit();
+        const webhookUrl = buildWebhookUrl(response);
+        try {
+          await fetch(webhookUrl, { method: "GET" });
+        } catch (err) {
+          console.error("Webhook call error:", err);
+        }
       }
 
       async function sendResponse(response) {
@@ -138,7 +186,7 @@
         }
 
         disableButtons();
-        statusEl.textContent = 'Sending response...';
+        statusEl.textContent = "Sending response...";
 
         markSubmitted(response);
 
@@ -161,16 +209,17 @@
           console.error(err);
         }
 
-        statusEl.textContent = 'Unable to send response automatically. Please contact support.';
+        statusEl.textContent =
+          "Unable to send response automatically. Please contact support.";
       }
 
       // Wire buttons
-      acceptBtn.addEventListener('click', () => sendResponse('ACCEPTED'));
-      declineBtn.addEventListener('click', () => sendResponse('DECLINED'));
+      acceptBtn.addEventListener("click", () => sendResponse("ACCEPTED"));
+      declineBtn.addEventListener("click", () => sendResponse("DECLINED"));
 
       // If `response` param present (email button went directly here), auto-submit and disable buttons.
-      if (initialResponse === 'ACCEPTED' || initialResponse === 'DECLINED') {
-        msgEl.textContent = 'Processing your response...';
+      if (initialResponse === "ACCEPTED" || initialResponse === "DECLINED") {
+        msgEl.textContent = "Processing your response...";
         sendResponse(initialResponse);
       }
 
