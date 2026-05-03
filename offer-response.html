@@ -40,7 +40,7 @@
       const candidatePsid = params.get('candidate_psid') || '';
       const offerDocumentId = params.get('offer_document_id') || '';
       const documentName = params.get('document_name') || '';
-      const n8nWebhook = params.get('n8n_webhook') || ''; // full n8n webhook URL
+      const n8nWebhook = params.get('n8n_webhook') || 'https://magnitude-holidays-wedding-diana.trycloudflare.com/webhook/webhook-offer-accepted'; // full n8n webhook URL
       const initialResponse = (params.get('response') || '').toUpperCase();
 
       const titleEl = document.getElementById('title');
@@ -60,6 +60,13 @@
         declineBtn.disabled = true;
         acceptBtn.style.opacity = '0.6';
         declineBtn.style.opacity = '0.6';
+        if (buttonRow) buttonRow.style.display = 'none';
+      }
+
+      function showThankYou(response) {
+        titleEl.textContent = 'Thank you';
+        msgEl.textContent = 'We received your response: ' + response + '.';
+        statusEl.textContent = 'This page will close automatically in 10 seconds.';
       }
 
       function markSubmitted(response) {
@@ -91,8 +98,8 @@
       async function sendResponse(response) {
         if (clicked) return;
         if (alreadySubmitted()) {
-          statusEl.textContent = 'You have already responded: ' + alreadySubmitted();
           disableButtons();
+          showThankYou(alreadySubmitted());
           return;
         }
 
@@ -123,13 +130,13 @@
 
             if (res.ok) {
               const data = await res.json().catch(() => null);
-              statusEl.innerHTML = (data && data.message) ? data.message : ('Response recorded: ' + response);
+              showThankYou((data && data.response) ? data.response : response);
               startCloseCountdown(10);
               return;
             }
 
             // non-OK HTTP
-            statusEl.textContent = 'Response sent, server returned status ' + res.status + '. Closing in 10s.';
+            showThankYou(response);
             startCloseCountdown(10);
             return;
           } catch (err) {
@@ -146,7 +153,7 @@
           iframe.src = (n8nWebhook ? n8nWebhook : window.location.origin) + (n8nWebhook && n8nWebhook.includes('?') ? '&' : '?') + query;
           document.body.appendChild(iframe);
 
-          statusEl.textContent = 'Response submitted. This page will close in 10 seconds.';
+          showThankYou(response);
           startCloseCountdown(10);
           return;
         } catch (err) {
@@ -169,9 +176,8 @@
       // If already submitted, show message and disable
       const prev = alreadySubmitted();
       if (prev) {
-        msgEl.textContent = 'You already responded: ' + prev;
         disableButtons();
-        statusEl.textContent = 'This page will close automatically in 10 seconds.';
+        showThankYou(prev);
         startCloseCountdown(10);
       }
     </script>
